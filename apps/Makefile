@@ -2,7 +2,7 @@
 programs := \
 			simple_writer.x \
 			simple_reader.x \
-			test_fs.x
+			test_fs.x 
 
 # File-system library
 FSLIB := libfs
@@ -11,6 +11,7 @@ libfs := $(FSPATH)/$(FSLIB).a
 
 # Default rule
 all: $(programs)
+	./fs_make.x disk.fs 8192
 
 # Avoid builtin rules and variables
 MAKEFLAGS += -rR
@@ -71,6 +72,7 @@ clean: FORCE
 	@echo "CLEAN	$(CUR_PWD)"
 	$(Q)$(MAKE) V=$(V) D=$(D) -C $(FSPATH) clean
 	$(Q)rm -rf $(objs) $(deps) $(programs)
+	rm -rf disk.fs
 
 # Keep object files around
 .PRECIOUS: %.o
