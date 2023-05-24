@@ -23,21 +23,17 @@ struct superblock {
 	int8_t padding[SB_PADDING_LEN];
 };
 
-struct FAT_block {
-	uint16_t entries[FB_ENTRIES_PER_BLOCK];
-};
-
 struct FAT_node {
-	struct FAT_block* data;
+	uint16_t entries[FB_ENTRIES_PER_BLOCK];
 	struct FAT_node* next;
 };
 
-struct FAT_section {
+struct __attribute__ ((__packed__)) FAT_section {
 	struct FAT_node* start;
 	struct FAT_node* end;
 };
 
-struct root_directory {
+struct __attribute__ ((__packed__)) root_directory {
 	int8_t filename[FS_FILENAME_LEN];
 	int64_t file_size;
 	int16_t first_data_block_index;
@@ -45,11 +41,12 @@ struct root_directory {
 };
 
 struct superblock superblk;
-struct root_directory root_dir;
-struct FAT_section *FAT_nodes;
+struct FAT_section FAT_nodes;
+struct __attribute__ ((__packed__)) root_directory* rootdir_arr[FS_FILE_MAX_COUNT];
 
 int fs_mount(const char *diskname)
 {
+	// Check if diskname is invalid or if virtual disk cannot be opened
 	if (block_disk_open(diskname) == -1) {
 		return -1;
 	}
@@ -57,7 +54,7 @@ int fs_mount(const char *diskname)
 	// Store superblock info
 	int readret = block_read(0, &superblk);
 	if (readret == -1) {
-		fprintf(stderr, "Could not read from block (superblock)\n");
+		fprintf(stderr, "Could not read from disk (superblock)\n");
 		return -1;
 	}
 
@@ -73,37 +70,37 @@ int fs_mount(const char *diskname)
 	}
 
 	// Load FAT blocks
-	// void *FAT_blocks[superblk->num_blocks_FAT];
-
 	for (int8_t i = 1; i <= superblk.num_blocks_FAT; i++) {		
-		printf("i: %d\n", i);
-		struct FAT_block* new_FAT_blk = (struct FAT_block*)malloc(sizeof(struct FAT_block));
 		struct FAT_node* new_FAT_node = (struct FAT_node*)malloc(sizeof(struct FAT_node));
-		if (new_FAT_blk == NULL || new_FAT_node == NULL) {
+		if (new_FAT_node == NULL) {
 			fprintf(stderr, "Malloc failed");
 			return -1;
 		}
-		new_FAT_node->data = new_FAT_blk;
-		if (i == 1) {
-			FAT_nodes->start = new_FAT_node; // Seg fault
-			fprintf(stderr, "here\n");
-			FAT_nodes->end = new_FAT_node;
-		} else {
-			// struct FAT_node* prev_FAT_node = FAT_nodes->end;
-			FAT_nodes->end->next = new_FAT_node;
-			FAT_nodes->end = new_FAT_node;
+		readret = block_read(i, new_FAT_node->entries);
+		if (readret == -1) {
+			fprintf(stderr, "Could not read from disk (FAT block)\n");
+			return -1;
 		}
-		block_read(i, &FAT_nodes->end->data);
+		if (i == 1) {
+			// Setup new FAT node structure
+			new_FAT_node->next = NULL;
+			FAT_nodes.start = new_FAT_node;
+			FAT_nodes.end = new_FAT_node;
+		} else {
+			// Add to FAT node structure
+			FAT_nodes.end->next = new_FAT_node;
+			FAT_nodes.end = new_FAT_node;
+		}
 
 		if (i == superblk.num_blocks_FAT) {
-			FAT_nodes->end->next = NULL;
+			FAT_nodes.end->next = NULL;
 		}
 	}
 
 	// Store root directory info
-	readret = block_read(superblk.root_block_index, &root_dir);
+	readret = block_read(superblk.root_block_index, &rootdir_arr);
 	if (readret == -1) {
-		fprintf(stderr, "Could not read from block (root directory)\n");
+		fprintf(stderr, "Could not read from disk (root directory)\n");
 		return -1;
 	}
 
@@ -117,13 +114,41 @@ int fs_umount(void)
 		return -1;
 	}
 
-	for (int i = 0; i < superblk.num_data_blocks; i++) {
-		void * buf_out;
+	// Write out FAT blocks to disk
+	int writeret;
+	for (int8_t i = 1; i <= superblk.num_blocks_FAT; i++) {		
+		struct FAT_node* curr = FAT_nodes.start;
+		writeret = block_write(i, curr->entries);
+		if (writeret == -1) {
+			fprintf(stderr, "Could not write to disk (FAT block)\n");
+			return -1;
+		}
+		curr = curr->next;
 	}
+
+	// Write out root directory to disk
+	writeret = block_write(superblk.root_block_index, &rootdir_arr);
+	if (writeret == -1) {
+		fprintf(stderr, "Could not write to disk (root directory)\n");
+		return -1;
+	}
+
+	// Free the allocated data for FAT nodes
+	struct FAT_node* curr;
+	for (int8_t i = 0; i < superblk.num_blocks_FAT; i++) {
+		curr = FAT_nodes.start;
+		FAT_nodes.start = FAT_nodes.start->next;
+		free(curr);
+	}
+	
+	// Close the currently open virtual disk
+	if (block_disk_close() == -1) {
+		return -1;
+	}
+	return 0;
 }
 
-int fs_info(void)
-{
+int fs_info(void) {
 	//Check if no virtual disk file is open
 	if (block_disk_count() == -1) {
 		return -1;
@@ -135,8 +160,28 @@ int fs_info(void)
 	printf("rdir_blk=%d\n", superblk.root_block_index);
 	printf("data_blk=%d\n", superblk.data_block_start_index);
 	printf("data_blk_count=%d\n", superblk.num_data_blocks);
-	printf("fat_free_ratio=[unknown]\n"); // TO DO: FILL IN LATER
-	printf("rdir_free_ratio=[unknown]\n"); // TO DO: FILL IN LATER
+
+	// Check for free FAT blocks
+	int num_FAT_blks = 0;
+	struct FAT_node* curr = FAT_nodes.start;
+	for (int i = 0; i < superblk.num_blocks_FAT; i++) {
+		for (int j = 0; j < FB_ENTRIES_PER_BLOCK; j++) {
+			if (curr->entries[j] == 0) {
+				num_FAT_blks++;
+			}
+		}
+		curr = curr->next;
+	}
+	printf("fat_free_ratio=%d/%d\n", num_FAT_blks, superblk.num_data_blocks);
+	
+	// Check for empty filenames in root directory
+	int num_rdir_free = 0;
+	for (int i = 0; i < FS_FILE_MAX_COUNT; i++) {
+		if (&rootdir_arr[i]->filename[0] == NULL) {
+			num_rdir_free++;
+		}
+	}
+	printf("rdir_free_ratio=%d/128\n", num_rdir_free);
 	return 0;
 }
 
