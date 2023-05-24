@@ -24,7 +24,7 @@ struct superblock {
 };
 
 struct FAT_block {
-	int16_t entries[FB_ENTRIES_PER_BLOCK];
+	uint16_t entries[FB_ENTRIES_PER_BLOCK];
 };
 
 struct FAT_node {
@@ -44,8 +44,8 @@ struct root_directory {
 	int8_t padding[RD_PADDING_LEN];
 };
 
-struct superblock *superblk;
-struct root_directory *root_dir;
+struct superblock superblk;
+struct root_directory root_dir;
 struct FAT_section *FAT_nodes;
 
 int fs_mount(const char *diskname)
@@ -55,27 +55,28 @@ int fs_mount(const char *diskname)
 	}
 
 	// Store superblock info
-	void * buf;
-	int readret = block_read(0, buf);
+	int readret = block_read(0, &superblk);
 	if (readret == -1) {
 		fprintf(stderr, "Could not read from block (superblock)\n");
 		return -1;
 	}
-	superblk = buf;
 
 	// Check that signature is correct
-	if (superblk->signature != SB_EXPECTED_SIG) {
+	if (superblk.signature != SB_EXPECTED_SIG) {
 		return -1;
 	}
 	
 	// Check that superblock has correct number of blocks on disk
 	int blkcount = block_disk_count();
-	if (blkcount != superblk->num_blocks_on_disk) {
+	if (blkcount != superblk.num_blocks_on_disk) {
 		return -1;
 	}
 
 	// Load FAT blocks
-	for (int8_t i = 1; i <= superblk->num_blocks_FAT; i++) {		
+	// void *FAT_blocks[superblk->num_blocks_FAT];
+
+	for (int8_t i = 1; i <= superblk.num_blocks_FAT; i++) {		
+		printf("i: %d\n", i);
 		struct FAT_block* new_FAT_blk = (struct FAT_block*)malloc(sizeof(struct FAT_block));
 		struct FAT_node* new_FAT_node = (struct FAT_node*)malloc(sizeof(struct FAT_node));
 		if (new_FAT_blk == NULL || new_FAT_node == NULL) {
@@ -84,24 +85,27 @@ int fs_mount(const char *diskname)
 		}
 		new_FAT_node->data = new_FAT_blk;
 		if (i == 1) {
-			FAT_nodes->start = new_FAT_node;
+			FAT_nodes->start = new_FAT_node; // Seg fault
+			fprintf(stderr, "here\n");
 			FAT_nodes->end = new_FAT_node;
 		} else {
 			// struct FAT_node* prev_FAT_node = FAT_nodes->end;
 			FAT_nodes->end->next = new_FAT_node;
 			FAT_nodes->end = new_FAT_node;
 		}
-		block_read(i, buf);
-		FAT_nodes->end->data = buf;
+		block_read(i, &FAT_nodes->end->data);
 
-		if (i == superblk->num_blocks_FAT) {
+		if (i == superblk.num_blocks_FAT) {
 			FAT_nodes->end->next = NULL;
 		}
 	}
 
 	// Store root directory info
-	block_read(superblk->root_block_index, buf);
-	root_dir = buf;
+	readret = block_read(superblk.root_block_index, &root_dir);
+	if (readret == -1) {
+		fprintf(stderr, "Could not read from block (root directory)\n");
+		return -1;
+	}
 
 	return 0;
 }
@@ -113,7 +117,7 @@ int fs_umount(void)
 		return -1;
 	}
 
-	for (int i = 0; i < superblk->num_data_blocks; i++) {
+	for (int i = 0; i < superblk.num_data_blocks; i++) {
 		void * buf_out;
 	}
 }
@@ -126,11 +130,11 @@ int fs_info(void)
 	}
 
 	printf("FS Info:\n");
-	printf("total_blk_count=%d\n", superblk->num_blocks_on_disk);
-	printf("fat_blk_count=%d\n", superblk->num_blocks_FAT);
-	printf("rdir_blk=%d\n", superblk->root_block_index);
-	printf("data_blk=%d\n", superblk->data_block_start_index);
-	printf("data_blk_count=%d\n", superblk->num_data_blocks);
+	printf("total_blk_count=%d\n", superblk.num_blocks_on_disk);
+	printf("fat_blk_count=%d\n", superblk.num_blocks_FAT);
+	printf("rdir_blk=%d\n", superblk.root_block_index);
+	printf("data_blk=%d\n", superblk.data_block_start_index);
+	printf("data_blk_count=%d\n", superblk.num_data_blocks);
 	printf("fat_free_ratio=[unknown]\n"); // TO DO: FILL IN LATER
 	printf("rdir_free_ratio=[unknown]\n"); // TO DO: FILL IN LATER
 	return 0;
