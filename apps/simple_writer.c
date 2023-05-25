@@ -16,8 +16,8 @@ int main(int argc, char *argv[])
 {
 	int ret;
 	char *diskname;
-	int fd;
-	char data[26] = "abcdefghijklmnopqrstuvwxyz";
+	// int fd;
+	// char data[26] = "abcdefghijklmnopqrstuvwxyz";
 
 	if (argc < 1) {
 		printf("Usage: %s <diskimage>\n", argv[0]);
@@ -31,18 +31,23 @@ int main(int argc, char *argv[])
 
 	/* Create file and open */
 	ret = fs_create("myfile");
+	printf("fs_create: %d\n", ret);
 	ASSERT(!ret, "fs_create");
 
-	fd = fs_open("myfile");
-	ASSERT(fd >= 0, "fs_open");
+	/* Print info for mounted disk with new file */
+	ret = fs_info();
+	ASSERT(!ret, "fs_info");
 
-	/* Write some data */
-	ret = fs_write(fd, data, sizeof(data));
-	ASSERT(ret == sizeof(data), "fs_write");
+	// fd = fs_open("myfile");
+	// ASSERT(fd >= 0, "fs_open");
 
-	/* Close file and unmount */
-	fs_close(fd);
-	fs_umount();
+	// /* Write some data */
+	// ret = fs_write(fd, data, sizeof(data));
+	// ASSERT(ret == sizeof(data), "fs_write");
+
+	// /* Close file and unmount */
+	// fs_close(fd);
+	// fs_umount();
 
 	return 0;
 }

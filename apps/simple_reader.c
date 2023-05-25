@@ -16,8 +16,8 @@ int main(int argc, char *argv[])
 {
 	int ret;
 	char *diskname;
-	int fd;
-	char data[26];
+	// int fd;
+	// char data[26];
 
 	if (argc < 1) {
 		printf("Usage: %s <diskimage>\n", argv[0]);
@@ -33,19 +33,19 @@ int main(int argc, char *argv[])
 	ret = fs_info();
 	ASSERT(!ret, "fs_info");
 
-	/* Open file */
-	fd = fs_open("myfile");
-	ASSERT(fd >= 0, "fs_open");
+	// /* Open file */
+	// fd = fs_open("myfile");
+	// ASSERT(fd >= 0, "fs_open");
 
-	/* Read some data */
-	fs_lseek(fd, 12);
-	ret = fs_read(fd, data, 10);
-	ASSERT(ret == 10, "fs_read");
-	ASSERT(!strncmp(data, "mnopqrstuv", 10), "fs_read");
+	// /* Read some data */
+	// fs_lseek(fd, 12);
+	// ret = fs_read(fd, data, 10);
+	// ASSERT(ret == 10, "fs_read");
+	// ASSERT(!strncmp(data, "mnopqrstuv", 10), "fs_read");
 
-	/* Close file and unmount */
-	fs_close(fd);
-	fs_umount();
+	// /* Close file and unmount */
+	// fs_close(fd);
+	// fs_umount();
 
 	return 0;
 }

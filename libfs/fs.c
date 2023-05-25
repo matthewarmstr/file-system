@@ -42,11 +42,12 @@ struct __attribute__ ((__packed__)) root_directory {
 
 struct superblock superblk;
 struct FAT_section FAT_nodes;
-struct __attribute__ ((__packed__)) root_directory* rootdir_arr[FS_FILE_MAX_COUNT];
+struct __attribute__ ((__packed__)) root_directory *rootdir_arr[FS_FILE_MAX_COUNT];
+int FS_mounted = 0;
 
 int fs_mount(const char *diskname)
 {
-	// Check if diskname is invalid or if virtual disk cannot be opened
+	// Check if virtual disk cannot be opened or if no valid file system can be located
 	if (block_disk_open(diskname) == -1) {
 		return -1;
 	}
@@ -104,14 +105,16 @@ int fs_mount(const char *diskname)
 		return -1;
 	}
 
+	FS_mounted = 1;
 	return 0;
 }
 
 int fs_umount(void)
 {
-	// Check if no FS is mounted or if disk cannot be closed
-	if (block_disk_count() == -1) {
+	// Check if no FS is mounted, if disk cannot be closed, or if there are still open file descriptors
+	if (!FS_mounted || block_disk_count() == -1) {
 		return -1;
+		// TO DO: add to error check
 	}
 
 	// Write out FAT blocks to disk
@@ -149,7 +152,7 @@ int fs_umount(void)
 }
 
 int fs_info(void) {
-	//Check if no virtual disk file is open
+	// Check if no virtual disk is open
 	if (block_disk_count() == -1) {
 		return -1;
 	}
@@ -161,7 +164,7 @@ int fs_info(void) {
 	printf("data_blk=%d\n", superblk.data_block_start_index);
 	printf("data_blk_count=%d\n", superblk.num_data_blocks);
 
-	// Check for free FAT blocks
+	// Count number of free FAT blocks
 	int num_FAT_blks = 0;
 	struct FAT_node* curr = FAT_nodes.start;
 	for (int i = 0; i < superblk.num_blocks_FAT; i++) {
@@ -174,7 +177,7 @@ int fs_info(void) {
 	}
 	printf("fat_free_ratio=%d/%d\n", num_FAT_blks, superblk.num_data_blocks);
 	
-	// Check for empty filenames in root directory
+	// Count number of empty filenames in root directory
 	int num_rdir_free = 0;
 	for (int i = 0; i < FS_FILE_MAX_COUNT; i++) {
 		if (&rootdir_arr[i]->filename[0] == NULL) {
@@ -187,7 +190,41 @@ int fs_info(void) {
 
 int fs_create(const char *filename)
 {
-	/* TODO: Phase 2 */
+	// Count number of non-empty filenames in root directory
+	int num_rdir_files = 0;
+	for (int i = 0; i < FS_FILE_MAX_COUNT; i++) {
+		if (&rootdir_arr[i]->filename[0] != NULL) {
+			num_rdir_files++;
+		}
+		// Check if filename to insert already exists in root directory
+		if (!(strcmp(rootdir_arr[i]->filename, filename))) { // SEG FAULT
+			return -1;
+		}
+	}
+	printf("num_rdir_files: %d\n", num_rdir_files);
+	
+	// Check if no FS mounted, if filename is invalid, if if given filename is too long, 
+	// or if root directory alrady has the max # of files
+	if (!FS_mounted || &filename[0] == NULL || strlen(filename) >= FS_FILENAME_LEN 
+		|| num_rdir_files >= FS_FILE_MAX_COUNT) {
+		return -2;
+	}
+
+	// Locate empty entry in root directory
+	int empty_entry_idx;
+	for (int i = 0; i < FS_FILE_MAX_COUNT; i++) {
+		if (&rootdir_arr[i]->filename[0] == NULL) {
+			empty_entry_idx = i;
+			break;
+		}
+	}	
+
+	// Create new & empty file with given filename atempty entry in root directory
+	strcpy(rootdir_arr[empty_entry_idx]->filename, filename);
+	rootdir_arr[empty_entry_idx]->file_size = 0;
+	rootdir_arr[empty_entry_idx]->first_data_block_index = FAT_EOC;
+
+	return 0;
 }
 
 int fs_delete(const char *filename)
