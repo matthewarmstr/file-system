@@ -34,7 +34,7 @@ struct __attribute__ ((__packed__)) FAT_section {
 };
 
 struct __attribute__ ((__packed__)) root_directory {
-	int8_t filename[FS_FILENAME_LEN];
+	int8_t *filename;
 	int64_t file_size;
 	int16_t first_data_block_index;
 	int8_t padding[RD_PADDING_LEN];
@@ -42,7 +42,7 @@ struct __attribute__ ((__packed__)) root_directory {
 
 struct superblock superblk;
 struct FAT_section FAT_nodes;
-struct __attribute__ ((__packed__)) root_directory *rootdir_arr[FS_FILE_MAX_COUNT];
+struct __attribute__ ((__packed__)) root_directory rootdir_arr[FS_FILE_MAX_COUNT];
 int FS_mounted = 0;
 
 int fs_mount(const char *diskname)
@@ -180,7 +180,7 @@ int fs_info(void) {
 	// Count number of empty filenames in root directory
 	int num_rdir_free = 0;
 	for (int i = 0; i < FS_FILE_MAX_COUNT; i++) {
-		if (&rootdir_arr[i]->filename[0] == NULL) {
+		if (&rootdir_arr[i].filename[0] == NULL) {
 			num_rdir_free++;
 		}
 	}
@@ -193,37 +193,36 @@ int fs_create(const char *filename)
 	// Count number of non-empty filenames in root directory
 	int num_rdir_files = 0;
 	for (int i = 0; i < FS_FILE_MAX_COUNT; i++) {
-		if (&rootdir_arr[i]->filename[0] != NULL) {
+		if (&rootdir_arr[i].filename[0] != NULL) {
 			num_rdir_files++;
 		}
 		// Check if filename to insert already exists in root directory
-		if (!(strcmp(rootdir_arr[i]->filename, filename))) { // SEG FAULT
+		if (!(strcmp((char*)&rootdir_arr[i].filename, filename))) { // SEG FAULT
 			return -1;
 		}
 	}
-	printf("num_rdir_files: %d\n", num_rdir_files);
 	
 	// Check if no FS mounted, if filename is invalid, if if given filename is too long, 
 	// or if root directory alrady has the max # of files
 	if (!FS_mounted || &filename[0] == NULL || strlen(filename) >= FS_FILENAME_LEN 
 		|| num_rdir_files >= FS_FILE_MAX_COUNT) {
-		return -2;
-	}
+		return -1;
+		}
 
 	// Locate empty entry in root directory
 	int empty_entry_idx;
 	for (int i = 0; i < FS_FILE_MAX_COUNT; i++) {
-		if (&rootdir_arr[i]->filename[0] == NULL) {
+		if (&rootdir_arr[i].filename[0] == NULL) {
 			empty_entry_idx = i;
 			break;
 		}
-	}	
+	}
 
 	// Create new & empty file with given filename atempty entry in root directory
-	strcpy(rootdir_arr[empty_entry_idx]->filename, filename);
-	rootdir_arr[empty_entry_idx]->file_size = 0;
-	rootdir_arr[empty_entry_idx]->first_data_block_index = FAT_EOC;
-
+	strcpy((char*)&rootdir_arr[empty_entry_idx].filename, filename);
+	rootdir_arr[empty_entry_idx].file_size = 0;
+	rootdir_arr[empty_entry_idx].first_data_block_index = FAT_EOC;
+	
 	return 0;
 }
 
