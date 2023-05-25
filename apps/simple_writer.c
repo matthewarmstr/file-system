@@ -31,12 +31,20 @@ int main(int argc, char *argv[])
 
 	/* Create file and open */
 	ret = fs_create("myfile");
-	printf("fs_create: %d\n", ret);
 	ASSERT(!ret, "fs_create");
+
+	ret = fs_create("file2");
+	ASSERT(!ret, "fs_create");
+
+	ret = fs_delete("myfile");
+	ASSERT(!ret, "fs_delete");
 
 	/* Print info for mounted disk with new file */
 	ret = fs_info();
 	ASSERT(!ret, "fs_info");
+	/* Print FS info */
+	ret = fs_ls();
+	ASSERT(!ret, "fs_ls");
 
 	// fd = fs_open("myfile");
 	// ASSERT(fd >= 0, "fs_open");
