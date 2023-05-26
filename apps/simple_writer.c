@@ -16,7 +16,7 @@ int main(int argc, char *argv[])
 {
 	int ret;
 	char *diskname;
-	// int fd;
+	int fd;
 	// char data[26] = "abcdefghijklmnopqrstuvwxyz";
 
 	if (argc < 1) {
@@ -36,8 +36,8 @@ int main(int argc, char *argv[])
 	ret = fs_create("file2");
 	ASSERT(!ret, "fs_create");
 
-	ret = fs_delete("myfile");
-	ASSERT(!ret, "fs_delete");
+	// ret = fs_delete("myfile");
+	// ASSERT(!ret, "fs_delete");
 
 	/* Print info for mounted disk with new file */
 	ret = fs_info();
@@ -46,8 +46,11 @@ int main(int argc, char *argv[])
 	ret = fs_ls();
 	ASSERT(!ret, "fs_ls");
 
-	// fd = fs_open("myfile");
-	// ASSERT(fd >= 0, "fs_open");
+	fd = fs_open("myfile");
+	ASSERT(fd >= 0, "fs_open");
+
+	fd = fs_open("file2");
+	ASSERT(fd >= 0, "fs_open");
 
 	// /* Write some data */
 	// ret = fs_write(fd, data, sizeof(data));

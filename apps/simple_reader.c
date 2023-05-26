@@ -16,7 +16,7 @@ int main(int argc, char *argv[])
 {
 	int ret;
 	char *diskname;
-	// int fd;
+	int fd;
 	// char data[26];
 
 	if (argc < 1) {
@@ -33,9 +33,9 @@ int main(int argc, char *argv[])
 	ret = fs_info();
 	ASSERT(!ret, "fs_info");
 
-	// /* Open file */
-	// fd = fs_open("myfile");
-	// ASSERT(fd >= 0, "fs_open");
+	/* Open file */
+	fd = fs_open("myfile");
+	ASSERT(fd >= 0, "fs_open");
 
 	// /* Read some data */
 	// fs_lseek(fd, 12);

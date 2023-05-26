@@ -40,9 +40,16 @@ struct __attribute__ ((__packed__)) root_directory {
 	int8_t padding[RD_PADDING_LEN];
 };
 
+struct fd_entry {
+	int used;
+	int root_dir_index;
+	size_t offset;
+};
+
 struct superblock superblk;
 struct FAT_section FAT_nodes;
 struct __attribute__ ((__packed__)) root_directory rootdir_arr[FS_FILE_MAX_COUNT];
+struct fd_entry fd_table[FS_OPEN_MAX_COUNT];
 int FS_mounted = 0;
 
 int fs_mount(const char *diskname)
@@ -105,6 +112,12 @@ int fs_mount(const char *diskname)
 		return -1;
 	}
 
+	//initialize fd table
+	for (int i = 0 ; i < FS_OPEN_MAX_COUNT ; ++i) {
+		fd_table[i].used = 0;
+		fd_table[i].offset = 0;
+	}
+
 	FS_mounted = 1;
 	return 0;
 }
@@ -147,6 +160,7 @@ int fs_umount(void)
 	if (block_disk_close() == -1) {
 		return -1;
 	}
+	FS_mounted = 0;
 	return 0;
 }
 
@@ -318,7 +332,48 @@ int fs_ls(void)
 
 int fs_open(const char *filename)
 {
-	/* TODO: Phase 3 */
+	int filename_exists = 0;
+	int filename_rootdir_inx;
+	for (int i = 0; i < FS_FILE_MAX_COUNT; i++) {
+		// Check if filename exists in root directory or not
+		if (!(strcmp((char*)&rootdir_arr[i].filename, filename))) { 
+			filename_exists = 1;
+			filename_rootdir_inx = i;
+			rootdir_arr[i].filename = NULL;
+			break;
+		}
+	}
+
+	//if no fs is mounted, invalid filename, or filename doesn't exist
+	if (!FS_mounted || &filename[0] == NULL || strlen(filename) >= FS_FILENAME_LEN || !filename_exists) {
+		return -1;
+	}
+
+	//find first open fd, and also track if the fd table is full already
+	int next_open_fd_index;
+	int fd_table_full = 0;
+	for (int i = 0 ; i < FS_OPEN_MAX_COUNT ; ++i) {
+		if (!fd_table[i].used) {
+			next_open_fd_index = i;
+			break;
+		}
+		if (i == FS_OPEN_MAX_COUNT - 1) {
+			fd_table_full = 1;
+			break;
+		}
+	}
+
+	//already FS_OPEN_MAX_COUNT open files in fd table
+	if (fd_table_full) {
+		return -1;
+	}
+
+	fd_table[next_open_fd_index].used = 1;
+	fd_table[next_open_fd_index].root_dir_index = filename_rootdir_inx;
+	fd_table[next_open_fd_index].offset = 0;
+	
+	//fprintf(stderr, "FD returned for file %s is: %d\n", filename, next_open_fd_index);
+	return next_open_fd_index;
 }
 
 int fs_close(int fd)
