@@ -378,7 +378,14 @@ int fs_open(const char *filename)
 
 int fs_close(int fd)
 {
-	/* TODO: Phase 3 */
+	//if no FS is mounted, fd is out of bounds, or fd is not currently opem
+	if (!FS_mounted || fd < 0 || fd >= FS_OPEN_MAX_COUNT || !fd_table[fd].used) {
+		return -1;
+	}
+
+	fd_table[fd].used = 0;
+
+	return 0;
 }
 
 int fs_stat(int fd)
