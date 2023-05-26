@@ -339,7 +339,6 @@ int fs_open(const char *filename)
 		if (!(strcmp((char*)&rootdir_arr[i].filename, filename))) { 
 			filename_exists = 1;
 			filename_rootdir_inx = i;
-			rootdir_arr[i].filename = NULL;
 			break;
 		}
 	}
@@ -378,8 +377,13 @@ int fs_open(const char *filename)
 
 int fs_close(int fd)
 {
-	//if no FS is mounted, fd is out of bounds, or fd is not currently opem
-	if (!FS_mounted || fd < 0 || fd >= FS_OPEN_MAX_COUNT || !fd_table[fd].used) {
+	//if no FS is mounted or fd is out of bounds
+	if (!FS_mounted || fd < 0 || fd >= FS_OPEN_MAX_COUNT) {
+		return -1;
+	}
+
+	//if fd not currently open (separate if statement so we don't try to access out of bounds)
+	if (!fd_table[fd].used) {
 		return -1;
 	}
 
@@ -390,12 +394,35 @@ int fs_close(int fd)
 
 int fs_stat(int fd)
 {
-	/* TODO: Phase 3 */
+	//if no FS is mounted or fd is out of bounds
+	if (!FS_mounted || fd < 0 || fd >= FS_OPEN_MAX_COUNT) {
+		return -1;
+	}
+
+	//if fd not currently open (separate if statement so we don't try to access out of bounds)
+	if (!fd_table[fd].used) {
+		return -1;
+	}
+
+	return (rootdir_arr[fd_table[fd].root_dir_index].file_size);
 }
 
 int fs_lseek(int fd, size_t offset)
 {
-	/* TODO: Phase 3 */
+	//if no FS is mounted or fd is out of bounds
+	if (!FS_mounted || fd < 0 || fd >= FS_OPEN_MAX_COUNT) {
+		return -1;
+	}
+
+	//if fd not currently open (separate if statement so we don't try to access out of bounds)
+	//or offset > current file size
+	if (!fd_table[fd].used || (fd_table[fd].used && offset > fs_stat(fd))) {
+		return -1;
+	}
+
+	fd_table[fd].offset = offset;
+
+	return 0;
 }
 
 int fs_write(int fd, void *buf, size_t count)
