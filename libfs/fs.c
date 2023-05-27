@@ -182,6 +182,10 @@ int fs_info(void) {
 	struct FAT_node* curr = FAT_nodes.start;
 	for (int i = 0; i < superblk.num_blocks_FAT; i++) {
 		for (int j = 0; j < FB_ENTRIES_PER_BLOCK; j++) {
+			if (j == superblk.num_data_blocks) {
+				break;
+			}
+			
 			if (curr->entries[j] == 0) {
 				num_FAT_blks++;
 			}
