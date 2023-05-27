@@ -177,8 +177,10 @@ int fs_info(void) {
 	printf("data_blk=%d\n", superblk.data_block_start_index);
 	printf("data_blk_count=%d\n", superblk.num_data_blocks);
 
-	// Count number of free FAT blocks
+	// Count number of free FAT entries
 	int num_FAT_blks = 0;
+	int num_data_blocks = superblk.num_data_blocks;
+	int num_data_blocks_left = superblk.num_data_blocks;
 	struct FAT_node* curr = FAT_nodes.start;
 	for (int i = 0; i < superblk.num_blocks_FAT; i++) {
 		for (int j = 0; j < FB_ENTRIES_PER_BLOCK; j++) {
@@ -186,6 +188,16 @@ int fs_info(void) {
 				break;
 			}
 			
+		//to make sure we are only checking the # of data block entries in FAT table
+		//handles numbers of data blocks that are not multiples of 2048
+		if (num_data_blocks_left > FB_ENTRIES_PER_BLOCK) {
+			num_data_blocks_left -= FB_ENTRIES_PER_BLOCK;
+			num_data_blocks = FB_ENTRIES_PER_BLOCK;
+		}
+		else {
+			num_data_blocks = num_data_blocks_left;
+		} 
+		for (int j = 0; j < num_data_blocks ; j++) {
 			if (curr->entries[j] == 0) {
 				num_FAT_blks++;
 			}
