@@ -34,9 +34,9 @@ struct __attribute__ ((__packed__)) FAT_section {
 };
 
 struct __attribute__ ((__packed__)) root_directory {
-	int8_t *filename;
-	int64_t file_size;
-	int16_t first_data_block_index;
+	int8_t filename[FS_FILENAME_LEN];
+	uint32_t file_size;
+	uint16_t first_data_block_index;
 	int8_t padding[RD_PADDING_LEN];
 };
 
@@ -48,7 +48,7 @@ struct fd_entry {
 
 struct superblock superblk;
 struct FAT_section FAT_nodes;
-struct __attribute__ ((__packed__)) root_directory rootdir_arr[FS_FILE_MAX_COUNT];
+struct root_directory rootdir_arr[FS_FILE_MAX_COUNT];
 struct fd_entry fd_table[FS_OPEN_MAX_COUNT];
 int FS_mounted = 0;
 
@@ -183,20 +183,14 @@ int fs_info(void) {
 	int num_data_blocks_left = superblk.num_data_blocks;
 	struct FAT_node* curr = FAT_nodes.start;
 	for (int i = 0; i < superblk.num_blocks_FAT; i++) {
-		for (int j = 0; j < FB_ENTRIES_PER_BLOCK; j++) {
-			if (j == superblk.num_data_blocks) {
-				break;
-			}
-			
-		//to make sure we are only checking the # of data block entries in FAT table
-		//handles numbers of data blocks that are not multiples of 2048
+		// Make sure we are only checking the # of data block entries in FAT table
 		if (num_data_blocks_left > FB_ENTRIES_PER_BLOCK) {
 			num_data_blocks_left -= FB_ENTRIES_PER_BLOCK;
 			num_data_blocks = FB_ENTRIES_PER_BLOCK;
-		}
-		else {
+		} else {
 			num_data_blocks = num_data_blocks_left;
-		} 
+		}
+		
 		for (int j = 0; j < num_data_blocks ; j++) {
 			if (curr->entries[j] == 0) {
 				num_FAT_blks++;
@@ -209,7 +203,7 @@ int fs_info(void) {
 	// Count number of empty filenames in root directory
 	int num_rdir_free = 0;
 	for (int i = 0; i < FS_FILE_MAX_COUNT; i++) {
-		if (&rootdir_arr[i].filename[0] == NULL) {
+		if (rootdir_arr[i].filename[0] == '\0') {
 			num_rdir_free++;
 		}
 	}
@@ -222,7 +216,7 @@ int fs_create(const char *filename)
 	// Count number of non-empty filenames in root directory
 	int num_rdir_files = 0;
 	for (int i = 0; i < FS_FILE_MAX_COUNT; i++) {
-		if (&rootdir_arr[i].filename[0] != NULL) {
+		if (rootdir_arr[i].filename[0] != '\0') {
 			num_rdir_files++;
 		}
 		// Check if filename to insert already exists in root directory
@@ -241,35 +235,41 @@ int fs_create(const char *filename)
 	// Locate empty entry in root directory
 	int empty_entry_idx;
 	for (int i = 0; i < FS_FILE_MAX_COUNT; i++) {
-		if (&rootdir_arr[i].filename[0] == NULL) {
+		if (rootdir_arr[i].filename[0] == '\0') {
 			empty_entry_idx = i;
 			break;
 		}
 	}
 
-	// Create new & empty file with given filename at empty entry in root directory
-	strcpy((char*)&rootdir_arr[empty_entry_idx].filename, filename);
-	rootdir_arr[empty_entry_idx].file_size = 0;
-
+	// Allocate space to store new filename string (2 bytes)
+	int8_t *new_filename;
+	new_filename = (int8_t*)strndup(filename, FS_FILENAME_LEN);
 	
-	int first_free_FAT_idx;
-	int free_FAT_found = 0;
-	struct FAT_node* curr = FAT_nodes.start;
-	for (int i = 0; i < superblk.num_blocks_FAT; i++) {
-		for (int j = 0; j < FB_ENTRIES_PER_BLOCK; j++) {
-			if (curr->entries[j] == 0) {
-				first_free_FAT_idx = j;
-				free_FAT_found = 1;
-				break;
-			}
-		}
-		if (free_FAT_found == 1) {
-			break;
-		}
-		curr = curr->next;
-	}
-	curr->entries[first_free_FAT_idx] = FAT_EOC;
-	rootdir_arr[empty_entry_idx].first_data_block_index = first_free_FAT_idx;
+	// Create new & empty file with given filename at empty entry in root directory
+	memcpy((int8_t*)&rootdir_arr[empty_entry_idx].filename, new_filename, FS_FILENAME_LEN);
+	rootdir_arr[empty_entry_idx].file_size = 0;
+	rootdir_arr[empty_entry_idx].first_data_block_index = FAT_EOC;
+	
+	// int first_free_FAT_idx;
+	// int free_FAT_found = 0;
+	// struct FAT_node* curr = FAT_nodes.start;
+	// for (int i = 0; i < superblk.num_blocks_FAT; i++) {
+	// 	for (int j = 1; j < FB_ENTRIES_PER_BLOCK; j++) {
+	// 		if (curr->entries[j] == 0) {
+	// 			// first_free_FAT_idx = j;
+	// 			curr->entries[j] = FAT_EOC;
+	// 			free_FAT_found = 1;
+	// 			break;
+	// 		}
+	// 	}
+	// 	if (free_FAT_found == 1) {
+	// 		break;
+	// 	}
+	// 	curr = curr->next;
+	// }
+
+	// curr->entries[first_free_FAT_idx] = FAT_EOC;
+	// rootdir_arr[empty_entry_idx].first_data_block_index = first_free_FAT_idx;
 	
 	return 0;
 }
@@ -283,7 +283,7 @@ int fs_delete(const char *filename)
 		if (!(strcmp((char*)&rootdir_arr[i].filename, filename))) { 
 			filename_exists = 1;
 			filename_rootdir_inx = i;
-			rootdir_arr[i].filename = NULL;
+			rootdir_arr[i].filename[0] = '\0';
 			break;
 		}
 	}
@@ -335,11 +335,11 @@ int fs_ls(void)
 	// Iterate through root directory and files with their names and sizes
 	printf("FS Ls:\n");
 	for (int i = 0; i < FS_FILE_MAX_COUNT; i++) {
-		if (&rootdir_arr[i].filename[0] != NULL) {
+		if (rootdir_arr[i].filename[0] != '\0') {
 			char filename[FS_FILENAME_LEN];
 			memcpy(filename, (void*)&rootdir_arr[i].filename, FS_FILENAME_LEN);
 			printf("file: %s, ", filename);
-			printf("size: %ld, ", rootdir_arr[i].file_size);
+			printf("size: %d, ", rootdir_arr[i].file_size);
 			printf("data_blk: %d\n", rootdir_arr[i].first_data_block_index);
 		}
 	}
@@ -359,12 +359,12 @@ int fs_open(const char *filename)
 		}
 	}
 
-	//if no fs is mounted, invalid filename, or filename doesn't exist
+	// Check if no fs is mounted, if invalid filename, or if filename doesn't exist
 	if (!FS_mounted || &filename[0] == NULL || strlen(filename) >= FS_FILENAME_LEN || !filename_exists) {
 		return -1;
 	}
 
-	//find first open fd, and also track if the fd table is full already
+	// Find first open FD, and also check if the FD table is already full
 	int next_open_fd_index;
 	int fd_table_full = 0;
 	for (int i = 0 ; i < FS_OPEN_MAX_COUNT ; ++i) {
@@ -378,7 +378,6 @@ int fs_open(const char *filename)
 		}
 	}
 
-	//already FS_OPEN_MAX_COUNT open files in fd table
 	if (fd_table_full) {
 		return -1;
 	}
@@ -393,12 +392,12 @@ int fs_open(const char *filename)
 
 int fs_close(int fd)
 {
-	//if no FS is mounted or fd is out of bounds
+	// Check if no FS is mounted or if FD is out of bounds
 	if (!FS_mounted || fd < 0 || fd >= FS_OPEN_MAX_COUNT) {
 		return -1;
 	}
 
-	//if fd not currently open (separate if statement so we don't try to access out of bounds)
+	// Check if FD not currently open (separate if statement so we don't try to access out of bounds)
 	if (!fd_table[fd].used) {
 		return -1;
 	}
@@ -410,12 +409,12 @@ int fs_close(int fd)
 
 int fs_stat(int fd)
 {
-	//if no FS is mounted or fd is out of bounds
+	// Check if no FS is mounted or if FD is out of bounds
 	if (!FS_mounted || fd < 0 || fd >= FS_OPEN_MAX_COUNT) {
 		return -1;
 	}
 
-	//if fd not currently open (separate if statement so we don't try to access out of bounds)
+	// Check if FD not currently open (separate if statement so we don't try to access out of bounds)
 	if (!fd_table[fd].used) {
 		return -1;
 	}
@@ -425,13 +424,12 @@ int fs_stat(int fd)
 
 int fs_lseek(int fd, size_t offset)
 {
-	//if no FS is mounted or fd is out of bounds
+	// Check if no FS is mounted or if FD is out of bounds
 	if (!FS_mounted || fd < 0 || fd >= FS_OPEN_MAX_COUNT) {
 		return -1;
 	}
 
-	//if fd not currently open (separate if statement so we don't try to access out of bounds)
-	//or offset > current file size
+	// Check if FD not currently open or if offset > current file size
 	if (!fd_table[fd].used || (fd_table[fd].used && offset > fs_stat(fd))) {
 		return -1;
 	}

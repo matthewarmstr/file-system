@@ -36,6 +36,9 @@ int main(int argc, char *argv[])
 	ret = fs_create("file2");
 	ASSERT(!ret, "fs_create");
 
+	ret = fs_create("test-file-1");
+	ASSERT(!ret, "fs_create");
+
 	// ret = fs_delete("myfile");
 	// ASSERT(!ret, "fs_delete");
 
