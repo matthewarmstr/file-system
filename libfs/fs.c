@@ -229,7 +229,7 @@ int fs_create(const char *filename)
 	// or if root directory alrady has the max # of files
 	if (!FS_mounted || &filename[0] == NULL || strlen(filename) >= FS_FILENAME_LEN 
 		|| num_rdir_files >= FS_FILE_MAX_COUNT) {
-		return -2;
+		return -1;
 	}
 
 	// Locate empty entry in root directory
@@ -250,6 +250,7 @@ int fs_create(const char *filename)
 	rootdir_arr[empty_entry_idx].file_size = 0;
 	rootdir_arr[empty_entry_idx].first_data_block_index = FAT_EOC;
 	
+	// DELETE LATER - FOR REFERENCE ONLY
 	// int first_free_FAT_idx;
 	// int free_FAT_found = 0;
 	// struct FAT_node* curr = FAT_nodes.start;
@@ -294,33 +295,36 @@ int fs_delete(const char *filename)
 		return -1;
 	}
 
-	// Calculate FAT block entry of index to delete from 
-	int FAT_block_num = rootdir_arr[filename_rootdir_inx].first_data_block_index / FB_ENTRIES_PER_BLOCK;
-	int delete_FAT_inx = rootdir_arr[filename_rootdir_inx].first_data_block_index % FB_ENTRIES_PER_BLOCK;
-	
-	// Locate appropriate FAT node
-	struct FAT_node* curr = FAT_nodes.start;
-	for (int i = 0; i < superblk.num_blocks_FAT; i++) {
-		if (i == FAT_block_num) {
-			break;
-		}
-		curr = curr->next;
-	}
-
-	// Go through entries of FAT block to delete from
-	int delete_FAT_next_inx;
-	while(1) {
-		delete_FAT_next_inx = curr->entries[delete_FAT_inx];
-		curr->entries[delete_FAT_inx] = 0;
-		if (delete_FAT_next_inx == FAT_EOC) {
-			break;
-		}
-		delete_FAT_next_inx = delete_FAT_next_inx % FB_ENTRIES_PER_BLOCK;
-		if (delete_FAT_inx > delete_FAT_next_inx) {
-			// Assuming in-order FAT entries
+	// For stored files that are not empty, calculate FAT block entry of index to delete from
+	if (rootdir_arr[filename_rootdir_inx].first_data_block_index != FAT_EOC) {
+		int FAT_block_num = rootdir_arr[filename_rootdir_inx].first_data_block_index / FB_ENTRIES_PER_BLOCK;
+		int delete_FAT_inx = rootdir_arr[filename_rootdir_inx].first_data_block_index % FB_ENTRIES_PER_BLOCK;
+		printf("FAT_block_num: %d, delete_FAT_inx: %d\n", FAT_block_num, delete_FAT_inx);
+		
+		// Locate appropriate FAT node
+		struct FAT_node* curr = FAT_nodes.start;
+		for (int i = 0; i < superblk.num_blocks_FAT; i++) {
+			if (i == FAT_block_num) {
+				break;
+			}
 			curr = curr->next;
 		}
-		delete_FAT_inx = delete_FAT_next_inx;
+
+		// Go through entries of FAT block to delete from
+		int delete_FAT_next_inx;
+		while(1) {
+			delete_FAT_next_inx = curr->entries[delete_FAT_inx];
+			curr->entries[delete_FAT_inx] = 0;
+			if (delete_FAT_next_inx == FAT_EOC) {
+				break;
+			}
+			delete_FAT_next_inx = delete_FAT_next_inx % FB_ENTRIES_PER_BLOCK;
+			if (delete_FAT_inx > delete_FAT_next_inx) {
+				// Assuming in-order FAT entries
+				curr = curr->next;
+			}
+			delete_FAT_inx = delete_FAT_next_inx;
+		}
 	}
 	return 0;
 }
@@ -441,11 +445,27 @@ int fs_lseek(int fd, size_t offset)
 
 int fs_write(int fd, void *buf, size_t count)
 {
-	/* TODO: Phase 4 */
+	// Check if no FS is mounted or if FD is out of bounds
+	if (!FS_mounted || fd < 0 || fd >= FS_OPEN_MAX_COUNT) {
+		return -1;
+	}
+
+	// Check if FD is not currently open or if buf is NULL
+	if (!fd_table[fd].used || buf == NULL) {
+		return -1;
+	}
 }
 
 int fs_read(int fd, void *buf, size_t count)
 {
-	/* TODO: Phase 4 */
+	// Check if no FS is mounted or if FD is out of bounds
+	if (!FS_mounted || fd < 0 || fd >= FS_OPEN_MAX_COUNT) {
+		return -1;
+	}
+
+	// Check if FD is not currently open or if buf is NULL
+	if (!fd_table[fd].used || buf == NULL) {
+		return -1;
+	}
 }
 
