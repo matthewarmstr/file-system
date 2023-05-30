@@ -52,6 +52,39 @@ struct root_directory rootdir_arr[FS_FILE_MAX_COUNT];
 struct fd_entry fd_table[FS_OPEN_MAX_COUNT];
 int FS_mounted = 0;
 
+uint16_t return_data_block (int fd) {
+	int root_dir_idx = fd_table[fd].root_dir_index;
+	//how many data blocks past the first one 
+	int num_iterations = fd_table[fd].offset / BLOCK_SIZE;
+	int curr_data_blk_idx = rootdir_arr[root_dir_idx].first_data_block_index % FB_ENTRIES_PER_BLOCK;
+	int next_data_blk_idx;
+		
+	// Locate appropriate FAT node
+	int FAT_block_num = rootdir_arr[root_dir_idx].first_data_block_index / FB_ENTRIES_PER_BLOCK;
+	struct FAT_node* curr = FAT_nodes.start;
+	for (int i = 0; i < superblk.num_blocks_FAT; i++) {
+		if (i == FAT_block_num) {
+			break;
+		}
+		curr = curr->next;
+	}
+
+	// Go through entries of FAT block to delete from
+	for (int i = 0 ; i < num_iterations ; ++i) {
+		next_data_blk_idx = curr->entries[curr_data_blk_idx];
+		if (next_data_blk_idx == FAT_EOC) {
+			break;
+		}
+		next_data_blk_idx = next_data_blk_idx % FB_ENTRIES_PER_BLOCK;
+		if (curr_data_blk_idx > next_data_blk_idx) {
+			// Assuming in-order FAT entries
+			curr = curr->next;
+		}
+		curr_data_blk_idx = next_data_blk_idx;
+	}
+	return curr_data_blk_idx;
+}
+
 int fs_mount(const char *diskname)
 {
 	// Check if virtual disk cannot be opened or if no valid file system can be located
