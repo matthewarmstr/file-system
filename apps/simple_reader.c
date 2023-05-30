@@ -29,23 +29,29 @@ int main(int argc, char *argv[])
 	ret = fs_mount(diskname);
 	ASSERT(!ret, "fs_mount");
 
-	/* Print info for mounted disk */
-	ret = fs_info();
-	ASSERT(!ret, "fs_info");
-
-	/* Open file */
+	/* Create & open file */
+	ret = fs_create("myfile");
+	ASSERT(!ret, "fs_create");
 	fd = fs_open("myfile");
 	ASSERT(fd >= 0, "fs_open");
 
+	/* Print info for mounted disk w/ new file */
+	ret = fs_info();
+	ASSERT(!ret, "fs_info");
+	
+	/* Print FS info */
+	ret = fs_ls();
+	ASSERT(!ret, "fs_ls");
+
 	// /* Read some data */
-	// fs_lseek(fd, 12);
+	fs_lseek(fd, 12);
 	// ret = fs_read(fd, data, 10);
 	// ASSERT(ret == 10, "fs_read");
 	// ASSERT(!strncmp(data, "mnopqrstuv", 10), "fs_read");
 
 	// /* Close file and unmount */
-	// fs_close(fd);
-	// fs_umount();
+	fs_close(fd);
+	fs_umount();
 
 	return 0;
 }

@@ -2,6 +2,7 @@
 programs := \
 			simple_writer.x \
 			simple_reader.x \
+			complex_writer.x \
 			test_fs.x 
 
 # File-system library

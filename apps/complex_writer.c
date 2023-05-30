@@ -30,17 +30,40 @@ int main(int argc, char *argv[])
 	ASSERT(!ret, "fs_mount");
 
 	/* Create file and open */
-	ret = fs_create("test-file");
+	ret = fs_create("myfile1");
 	ASSERT(!ret, "fs_create");
 
-	fd = fs_open("test-file");
+	ret = fs_create("file2");
+	ASSERT(!ret, "fs_create");
+
+	ret = fs_create("test-file-1");
+	ASSERT(!ret, "fs_create");
+
+	ret = fs_delete("myfile1");
+	ASSERT(!ret, "fs_delete");
+
+	/* Print info for mounted disk with new file */
+	ret = fs_info();
+	ASSERT(!ret, "fs_info");
+	
+	/* Print FS info */
+	ret = fs_ls();
+	ASSERT(!ret, "fs_ls");
+
+	fd = fs_open("myfile1");
+	ASSERT(fd == -1, "fs_open");
+
+	fd = fs_open("invalidfile");
+	ASSERT(fd == -1, "fs_open");
+
+	fd = fs_open("file2");
 	ASSERT(fd >= 0, "fs_open");
 
-	/* Write some data */
+	// /* Write some data */
 	// ret = fs_write(fd, data, sizeof(data));
 	// ASSERT(ret == sizeof(data), "fs_write");
 
-	/* Close file and unmount */
+	// /* Close file and unmount */
 	fs_close(fd);
 	fs_umount();
 
