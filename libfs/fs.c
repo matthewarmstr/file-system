@@ -86,6 +86,59 @@ size_t return_data_block (int fd) {
 	return curr_data_blk_idx;
 }
 
+// returns -1 if there are no more open FAT entries
+// otherwise, returns index of the new block allocated for fd.
+size_t allocate_new_data_block (int fd, int current_last_data_blk) {
+	size_t curr_fat_blk_idx = 1; 
+	size_t next_fat_blk_idx;
+		
+	// Locate appropriate FAT node
+	int FAT_block_num_last_entry = current_last_data_blk / FB_ENTRIES_PER_BLOCK;
+	struct FAT_node* curr = FAT_nodes.start;
+	
+	//Go through entries of FAT block to find next empty entry
+	for (int i = 0 ; i <  superblk.num_data_blocks ; ++i) {
+		next_fat_blk_idx = curr->entries[curr_fat_blk_idx % FB_ENTRIES_PER_BLOCK];
+		if ((next_fat_blk_idx != 0) && (i == superblk.num_data_blocks -1)) {
+			return -1;
+		}
+		else if (next_fat_blk_idx == 0) {
+			curr->entries[curr_fat_blk_idx % FB_ENTRIES_PER_BLOCK] = FAT_EOC;
+			break;
+		}
+
+		if (curr_fat_blk_idx > next_fat_blk_idx % FB_ENTRIES_PER_BLOCK) {
+			// Assuming in-order FAT entries
+			curr = curr->next;
+		}
+		curr_fat_blk_idx = next_fat_blk_idx;
+	}
+
+	curr = FAT_nodes.start;
+	for (int i = 0; i < FAT_block_num_last_entry; i++) {
+		if (i == FAT_block_num_last_entry) {
+			break;
+		}
+		curr = curr->next;
+	}
+	curr->entries[current_last_data_blk % FB_ENTRIES_PER_BLOCK] = curr_fat_blk_idx;
+	return curr_fat_blk_idx;
+}
+
+size_t get_next_data_blk (int fd, int current_data_blk) {
+		
+	// Locate appropriate FAT node
+	int FAT_block_num_last_entry = current_data_blk / FB_ENTRIES_PER_BLOCK;
+	struct FAT_node* curr = FAT_nodes.start;
+	for (int i = 0; i <= FAT_block_num_last_entry ; i++) {
+		if (i == FAT_block_num_last_entry) {
+			break;
+		}
+		curr = curr->next;
+	}
+	return curr->entries[current_data_blk % FB_ENTRIES_PER_BLOCK];
+}
+
 int fs_mount(const char *diskname)
 {
 	// Check if virtual disk cannot be opened or if no valid file system can be located
@@ -508,6 +561,7 @@ int fs_read(int fd, void *buf, size_t count)
 	size_t bytes_read = 0;
 	size_t bytes_remaining = count;
 	int data_blk_to_read = superblk.data_block_start_index + return_data_block(fd);	
+	int data_blk_offset = superblk.data_block_start_index;
 
 	// Go through all data blocks until there are no more data blocks to read
 	while (1) {
@@ -526,7 +580,7 @@ int fs_read(int fd, void *buf, size_t count)
 		size_t offset_distance = fd_table[fd].offset % BLOCK_SIZE;
 		size_t bytes_just_read;
 
-		// printf("BEFORE - blocks_left_to_read: %ld, bytes_remaining: %ld, bytes_read: %ld, offset_distance: %ld\n", blocks_left_to_read, bytes_remaining, bytes_read, offset_distance);
+		// printf("BEFORE - blocks_left_to_read: %ld, bytes_remaining: %ld, bytes_read: %ld, fd_table[fd].offset: %ld, offset_distance: %ld\n", blocks_left_to_read, bytes_remaining, bytes_read, fd_table[fd].offset, offset_distance);
 
 		if ((bytes_remaining + offset_distance) > BLOCK_SIZE) {
 			// Need to read another data block
@@ -534,8 +588,12 @@ int fs_read(int fd, void *buf, size_t count)
 			bytes_just_read = BLOCK_SIZE - offset_distance;
 			bytes_read += bytes_just_read;
 			bytes_remaining -= bytes_just_read;
+			
+			// Locate next data block index from FAT
+			data_blk_to_read = get_next_data_blk(fd, data_blk_to_read - data_blk_offset);
+			data_blk_to_read += data_blk_offset;
 		} else {
-			// Last data block / don't read up to the end of the data block
+			// Last data block, read remaining bytes
 			memcpy((void*)(buf + bytes_read), (void*)(bounce_buf + offset_distance), bytes_remaining % (BLOCK_SIZE+1));
 			bytes_just_read = bytes_remaining % (BLOCK_SIZE+1);
 			bytes_read += bytes_just_read;

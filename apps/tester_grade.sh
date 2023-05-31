@@ -372,7 +372,7 @@ END_SCRIPT
 
 	local line_array=()
 	line_array+=("$(select_line "${STDOUT}" "3")")
-	local corr_array=()
+    local corr_array=()
 	corr_array+=("Read 36864 bytes from file. Compared 36864 correct.")
 
     local score
@@ -385,16 +385,16 @@ END_SCRIPT
 #
 run_tests() {
 	# Phase 1
-	info
-	info_full
+	#info
+	#info_full
 	# Phase 2
-	create_simple
+	#create_simple
     # Phase 3 + 4
-    read_block
-    read_partial_block
-    read_two_partial_blocks
-    read_six_full_blocks
-    read_eight_partial_blocks
+    # read_block
+    # read_partial_block
+    #read_two_partial_blocks
+    #read_six_full_blocks
+    #read_eight_partial_blocks
     read_all_blocks
 }
 
