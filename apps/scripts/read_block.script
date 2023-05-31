@@ -1,4 +1,5 @@
 MOUNT
+CREATE  test-file-1
 OPEN	test-file-1
 READ	40  	FILE	test-file-1
 READ	1000	FILE	test-file-1

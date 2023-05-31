@@ -526,16 +526,18 @@ int fs_read(int fd, void *buf, size_t count)
 		size_t offset_distance = fd_table[fd].offset % BLOCK_SIZE;
 		size_t bytes_just_read;
 
+		// printf("BEFORE - blocks_left_to_read: %ld, bytes_remaining: %ld, bytes_read: %ld, offset_distance: %ld\n", blocks_left_to_read, bytes_remaining, bytes_read, offset_distance);
+
 		if ((bytes_remaining + offset_distance) > BLOCK_SIZE) {
 			// Need to read another data block
-			memcpy(buf + bytes_read, (void*)bounce_buf + offset_distance, BLOCK_SIZE - offset_distance);
+			memcpy((void*)(buf + bytes_read), (void*)(bounce_buf + offset_distance), BLOCK_SIZE - offset_distance);
 			bytes_just_read = BLOCK_SIZE - offset_distance;
 			bytes_read += bytes_just_read;
 			bytes_remaining -= bytes_just_read;
 		} else {
 			// Last data block / don't read up to the end of the data block
-			memcpy(buf + bytes_read, (void*)bounce_buf + offset_distance, bytes_remaining);
-			bytes_just_read = bytes_remaining;
+			memcpy((void*)(buf + bytes_read), (void*)(bounce_buf + offset_distance), bytes_remaining % (BLOCK_SIZE+1));
+			bytes_just_read = bytes_remaining % (BLOCK_SIZE+1);
 			bytes_read += bytes_just_read;
 			bytes_remaining = 0;
 		}
@@ -543,8 +545,19 @@ int fs_read(int fd, void *buf, size_t count)
 		// Update read status variables
 		fd_table[fd].offset += bytes_just_read;
 		blocks_left_to_read -= 1;
+		// printf("AFTER - blocks_left_to_read: %ld, bytes_remaining: %ld, bytes_read: %ld, offset_distance: %ld\n", blocks_left_to_read, bytes_remaining, bytes_read, offset_distance);
 	}
-
+////////////////////////////////////
+	// char bounce_buf[BLOCK_SIZE];
+	// size_t offset_distance = fd_table[fd].offset % BLOCK_SIZE;
+	// int readret = block_read(data_blk_to_read, &bounce_buf);
+	// if (readret == -1) {
+	// 	fprintf(stderr, "Could not read from disk (fs_read)\n");
+	// 	return -1;
+	// }
+	// memcpy(buf, (void*)bounce_buf + offset_distance, bytes_remaining);
+	// bytes_read = bytes_remaining;
+////////////////////////////////////
 	// char bounce_buf[BLOCK_SIZE];
 	// int readret = block_read(data_blk_to_read, &bounce_buf);
 	// if (readret == -1) {
@@ -556,7 +569,7 @@ int fs_read(int fd, void *buf, size_t count)
 	// for (int i = 0; i < count; i++) {
 	// 	printf("%d ", bounce_buf[i]);
 	// }
-	printf("Read %ld bytes from file. Compared %ld correct.\n", bytes_read, bytes_read);
+	// printf("Read %ld bytes from file. Compared %ld correct.\n", bytes_read, bytes_read);
 	// memcpy(buf, (void*)bounce_buf + fd_table[fd].offset, count);
 	//fd_table[fd].offset += count;
 	return bytes_read;
