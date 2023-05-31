@@ -17,7 +17,7 @@ int main(int argc, char *argv[])
 	int ret;
 	char *diskname;
 	int fd;
-	// char data[26];
+	char data[26];
 
 	if (argc < 1) {
 		printf("Usage: %s <diskimage>\n", argv[0]);
@@ -45,7 +45,7 @@ int main(int argc, char *argv[])
 
 	// /* Read some data */
 	fs_lseek(fd, 12);
-	// ret = fs_read(fd, data, 10);
+	ret = fs_read(fd, data, 10);
 	// ASSERT(ret == 10, "fs_read");
 	// ASSERT(!strncmp(data, "mnopqrstuv", 10), "fs_read");
 

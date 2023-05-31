@@ -1,0 +1,7 @@
+MOUNT
+OPEN	test-file-1
+READ	40  	FILE	test-file-1
+READ	1000	FILE	test-file-1
+READ	479 	FILE	test-file-1
+CLOSE
+UMOUNT

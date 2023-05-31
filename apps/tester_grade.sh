@@ -244,6 +244,118 @@ END_SCRIPT
     log "Score: ${score}"
 }
 
+# read part of a block
+read_partial_block() {
+    log "\n--- Running ${FUNCNAME} ---"
+
+	run_tool ./fs_make.x test.fs 10
+	python3 -c "for i in range(4096): print('a', end='')" > test-file-1
+	run_tool ./fs_ref.x add test.fs test-file-1
+    cat <<END_SCRIPT > read_block.script
+MOUNT
+OPEN	test-file-1
+READ	40	FILE	test-file-1
+CLOSE
+UMOUNT
+END_SCRIPT
+    run_test ./test_fs.x script test.fs read_block.script
+
+	rm -f test.fs test-file-1 read_block.script
+
+	local line_array=()
+	line_array+=("$(select_line "${STDOUT}" "3")")
+	local corr_array=()
+	corr_array+=("Read 40 bytes from file. Compared 40 correct.")
+
+    local score
+    compare_lines line_array[@] corr_array[@] score
+    log "Score: ${score}"
+}
+
+# read one and a half blocks
+read_two_blocks() {
+    log "\n--- Running ${FUNCNAME} ---"
+
+	run_tool ./fs_make.x test.fs 10
+	python3 -c "for i in range(20000): print('a', end='')" > test-file-1
+	run_tool ./fs_ref.x add test.fs test-file-1
+    cat <<END_SCRIPT > read_block.script
+MOUNT
+OPEN	test-file-1
+READ	6144	FILE	test-file-1
+CLOSE
+UMOUNT
+END_SCRIPT
+    run_test ./test_fs.x script test.fs read_block.script
+
+	rm -f test.fs test-file-1 read_block.script
+
+	local line_array=()
+	line_array+=("$(select_line "${STDOUT}" "3")")
+	local corr_array=()
+	corr_array+=("Read 6144 bytes from file. Compared 6144 correct.")
+
+    local score
+    compare_lines line_array[@] corr_array[@] score
+    log "Score: ${score}"
+}
+
+# read seven and a half blocks
+read_eight_blocks() {
+    log "\n--- Running ${FUNCNAME} ---"
+
+	run_tool ./fs_make.x test.fs 10
+	python3 -c "for i in range(35000): print('a', end='')" > test-file-1
+	run_tool ./fs_ref.x add test.fs test-file-1
+    cat <<END_SCRIPT > read_block.script
+MOUNT
+OPEN	test-file-1
+READ	30000	FILE	test-file-1
+CLOSE
+UMOUNT
+END_SCRIPT
+    run_test ./test_fs.x script test.fs read_block.script
+
+	rm -f test.fs test-file-1 read_block.script
+
+	local line_array=()
+	line_array+=("$(select_line "${STDOUT}" "3")")
+	local corr_array=()
+	corr_array+=("Read 30000 bytes from file. Compared 30000 correct.")
+
+    local score
+    compare_lines line_array[@] corr_array[@] score
+    log "Score: ${score}"
+}
+
+# read all blocks
+read_all_blocks() {
+    log "\n--- Running ${FUNCNAME} ---"
+
+	run_tool ./fs_make.x test.fs 10
+	python3 -c "for i in range(36864): print('a', end='')" > test-file-1
+	run_tool ./fs_ref.x add test.fs test-file-1
+    cat <<END_SCRIPT > read_block.script
+MOUNT
+OPEN	test-file-1
+READ	36864	FILE	test-file-1
+CLOSE
+UMOUNT
+END_SCRIPT
+    run_test ./test_fs.x script test.fs read_block.script
+
+	rm -f test.fs test-file-1 read_block.script
+
+	local line_array=()
+	line_array+=("$(select_line "${STDOUT}" "3")")
+	local corr_array=()
+	corr_array+=("Read 36864 bytes from file. Compared 36864 correct.")
+
+    local score
+    compare_lines line_array[@] corr_array[@] score
+    log "Score: ${score}"
+}
+
 #
 # Run tests
 #
@@ -254,7 +366,11 @@ run_tests() {
 	# Phase 2
 	create_simple
     # Phase 3 + 4
-	read_block
+    read_block
+    read_partial_block
+    read_two_blocks
+    read_eight_blocks
+    read_all_blocks
 }
 
 make_fs() {

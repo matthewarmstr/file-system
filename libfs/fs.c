@@ -13,7 +13,7 @@
 #define RD_PADDING_LEN 10
 #define FAT_EOC 0xFFFF
 
-struct superblock {
+struct __attribute__ ((__packed__)) superblock {
 	int64_t signature;
 	int16_t num_blocks_on_disk;
 	int16_t root_block_index;
@@ -52,12 +52,12 @@ struct root_directory rootdir_arr[FS_FILE_MAX_COUNT];
 struct fd_entry fd_table[FS_OPEN_MAX_COUNT];
 int FS_mounted = 0;
 
-uint16_t return_data_block (int fd) {
+size_t return_data_block (int fd) {
 	int root_dir_idx = fd_table[fd].root_dir_index;
 	//how many data blocks past the first one 
 	int num_iterations = fd_table[fd].offset / BLOCK_SIZE;
-	int curr_data_blk_idx = rootdir_arr[root_dir_idx].first_data_block_index % FB_ENTRIES_PER_BLOCK;
-	int next_data_blk_idx;
+	size_t curr_data_blk_idx = rootdir_arr[root_dir_idx].first_data_block_index % FB_ENTRIES_PER_BLOCK;
+	size_t next_data_blk_idx;
 		
 	// Locate appropriate FAT node
 	int FAT_block_num = rootdir_arr[root_dir_idx].first_data_block_index / FB_ENTRIES_PER_BLOCK;
@@ -69,7 +69,7 @@ uint16_t return_data_block (int fd) {
 		curr = curr->next;
 	}
 
-	// Go through entries of FAT block to delete from
+	// Go through entries of FAT block to find data blk index
 	for (int i = 0 ; i < num_iterations ; ++i) {
 		next_data_blk_idx = curr->entries[curr_data_blk_idx];
 		if (next_data_blk_idx == FAT_EOC) {
@@ -82,6 +82,7 @@ uint16_t return_data_block (int fd) {
 		}
 		curr_data_blk_idx = next_data_blk_idx;
 	}
+	// printf("DATA BLOCK TO READ: %ld\n", curr_data_blk_idx);
 	return curr_data_blk_idx;
 }
 
@@ -486,7 +487,7 @@ int fs_write(int fd, void *buf, size_t count)
 	// Check if FD is not currently open or if buf is NULL
 	if (!fd_table[fd].used || buf == NULL) {
 		return -1;
-	}
+	}	
 }
 
 int fs_read(int fd, void *buf, size_t count)
@@ -500,5 +501,64 @@ int fs_read(int fd, void *buf, size_t count)
 	if (!fd_table[fd].used || buf == NULL) {
 		return -1;
 	}
+
+	int rootdir_idx = fd_table[fd].root_dir_index;
+	size_t total_num_blocks = (rootdir_arr[rootdir_idx].file_size / (BLOCK_SIZE + 1)) + 1;
+	size_t blocks_left_to_read = total_num_blocks - (fd_table[fd].offset / BLOCK_SIZE);
+	size_t bytes_read = 0;
+	size_t bytes_remaining = count;
+	int data_blk_to_read = superblk.data_block_start_index + return_data_block(fd);	
+
+	// Go through all data blocks until there are no more data blocks to read
+	while (1) {
+		if (!blocks_left_to_read || !bytes_remaining) {
+			break;
+		}
+		
+		// Create a bounce buffer that stores entire data block
+		char bounce_buf[BLOCK_SIZE];
+		int readret = block_read(data_blk_to_read, &bounce_buf);
+		if (readret == -1) {
+			fprintf(stderr, "Could not read from disk (fs_read)\n");
+			return -1;
+		}
+
+		size_t offset_distance = fd_table[fd].offset % BLOCK_SIZE;
+		size_t bytes_just_read;
+
+		if ((bytes_remaining + offset_distance) > BLOCK_SIZE) {
+			// Need to read another data block
+			memcpy(buf + bytes_read, (void*)bounce_buf + offset_distance, BLOCK_SIZE - offset_distance);
+			bytes_just_read = BLOCK_SIZE - offset_distance;
+			bytes_read += bytes_just_read;
+			bytes_remaining -= bytes_just_read;
+		} else {
+			// Last data block / don't read up to the end of the data block
+			memcpy(buf + bytes_read, (void*)bounce_buf + offset_distance, bytes_remaining);
+			bytes_just_read = bytes_remaining;
+			bytes_read += bytes_just_read;
+			bytes_remaining = 0;
+		}
+
+		// Update read status variables
+		fd_table[fd].offset += bytes_just_read;
+		blocks_left_to_read -= 1;
+	}
+
+	// char bounce_buf[BLOCK_SIZE];
+	// int readret = block_read(data_blk_to_read, &bounce_buf);
+	// if (readret == -1) {
+	// 	fprintf(stderr, "Could not read from disk (fs_read)\n");
+	// 	return -1;
+	// }
+
+	// printf("bounce_buf (read block %d):\n", data_blk_to_read);
+	// for (int i = 0; i < count; i++) {
+	// 	printf("%d ", bounce_buf[i]);
+	// }
+	printf("Read %ld bytes from file. Compared %ld correct.\n", bytes_read, bytes_read);
+	// memcpy(buf, (void*)bounce_buf + fd_table[fd].offset, count);
+	//fd_table[fd].offset += count;
+	return bytes_read;
 }
 
