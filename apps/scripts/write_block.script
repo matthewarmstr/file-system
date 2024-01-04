@@ -1,0 +1,5 @@
+MOUNT
+OPEN	test-file-2
+WRITE	FILE	test-file-1-s3.txt
+CLOSE
+UMOUNT

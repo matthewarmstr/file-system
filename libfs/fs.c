@@ -40,7 +40,7 @@ struct __attribute__ ((__packed__)) root_directory {
 	int8_t padding[RD_PADDING_LEN];
 };
 
-struct fd_entry {
+struct __attribute__ ((__packed__)) fd_entry {
 	int used;
 	int root_dir_index;
 	size_t offset;
@@ -52,12 +52,39 @@ struct root_directory rootdir_arr[FS_FILE_MAX_COUNT];
 struct fd_entry fd_table[FS_OPEN_MAX_COUNT];
 int FS_mounted = 0;
 
-size_t return_data_block (int fd) {
+// returns index of data block where @offset of @fd is located (indexed by FAT table index, not overall block index)
+size_t return_data_block(int fd, size_t count) {
 	int root_dir_idx = fd_table[fd].root_dir_index;
 	//how many data blocks past the first one 
 	int num_iterations = fd_table[fd].offset / BLOCK_SIZE;
-	size_t curr_data_blk_idx = rootdir_arr[root_dir_idx].first_data_block_index % FB_ENTRIES_PER_BLOCK;
+	size_t curr_data_blk_idx = rootdir_arr[root_dir_idx].first_data_block_index; 
 	size_t next_data_blk_idx;
+
+	// if this file is currently empty, we must allocate the first data block (if we have bytes to write)
+	if (curr_data_blk_idx == FAT_EOC && count > 0) {
+		struct FAT_node* curr = FAT_nodes.start;
+		int curr_fat_blk_idx = 1;
+	
+		//Go through entries of FAT block to find next empty entry
+		for (int i = 0 ; i <  superblk.num_data_blocks ; ++i) {
+			next_data_blk_idx = curr->entries[curr_fat_blk_idx % FB_ENTRIES_PER_BLOCK];
+			if ((next_data_blk_idx != 0) && (i == superblk.num_data_blocks - 1)) {
+				return -1;
+			}
+			else if (next_data_blk_idx == 0) {
+				curr->entries[curr_fat_blk_idx % FB_ENTRIES_PER_BLOCK] = FAT_EOC;
+				break;
+			}
+
+			if (curr_fat_blk_idx % FB_ENTRIES_PER_BLOCK > next_data_blk_idx % FB_ENTRIES_PER_BLOCK) {
+				// Assuming in-order FAT entries
+				curr = curr->next;
+			}
+			++curr_fat_blk_idx; 
+		}
+		rootdir_arr[root_dir_idx].first_data_block_index = curr_fat_blk_idx;
+		return curr_fat_blk_idx; 
+	}
 		
 	// Locate appropriate FAT node
 	int FAT_block_num = rootdir_arr[root_dir_idx].first_data_block_index / FB_ENTRIES_PER_BLOCK;
@@ -71,24 +98,23 @@ size_t return_data_block (int fd) {
 
 	// Go through entries of FAT block to find data blk index
 	for (int i = 0 ; i < num_iterations ; ++i) {
-		next_data_blk_idx = curr->entries[curr_data_blk_idx];
+		next_data_blk_idx = curr->entries[curr_data_blk_idx % FB_ENTRIES_PER_BLOCK];
 		if (next_data_blk_idx == FAT_EOC) {
 			break;
 		}
-		next_data_blk_idx = next_data_blk_idx % FB_ENTRIES_PER_BLOCK;
-		if (curr_data_blk_idx > next_data_blk_idx) {
+		//next_data_blk_idx = next_data_blk_idx % FB_ENTRIES_PER_BLOCK;
+		if (curr_data_blk_idx % FB_ENTRIES_PER_BLOCK > next_data_blk_idx % FB_ENTRIES_PER_BLOCK) {
 			// Assuming in-order FAT entries
 			curr = curr->next;
 		}
 		curr_data_blk_idx = next_data_blk_idx;
 	}
-	// printf("DATA BLOCK TO READ: %ld\n", curr_data_blk_idx);
 	return curr_data_blk_idx;
 }
 
 // returns -1 if there are no more open FAT entries
 // otherwise, returns index of the new block allocated for fd.
-size_t allocate_new_data_block (int fd, int current_last_data_blk) {
+int allocate_new_data_block (int fd, int current_last_data_blk) {
 	size_t curr_fat_blk_idx = 1; 
 	size_t next_fat_blk_idx;
 		
@@ -99,7 +125,7 @@ size_t allocate_new_data_block (int fd, int current_last_data_blk) {
 	//Go through entries of FAT block to find next empty entry
 	for (int i = 0 ; i <  superblk.num_data_blocks ; ++i) {
 		next_fat_blk_idx = curr->entries[curr_fat_blk_idx % FB_ENTRIES_PER_BLOCK];
-		if ((next_fat_blk_idx != 0) && (i == superblk.num_data_blocks -1)) {
+		if ((next_fat_blk_idx != 0) && (i == superblk.num_data_blocks - 1)) {
 			return -1;
 		}
 		else if (next_fat_blk_idx == 0) {
@@ -107,11 +133,11 @@ size_t allocate_new_data_block (int fd, int current_last_data_blk) {
 			break;
 		}
 
-		if (curr_fat_blk_idx > next_fat_blk_idx % FB_ENTRIES_PER_BLOCK) {
+		if (curr_fat_blk_idx % FB_ENTRIES_PER_BLOCK > next_fat_blk_idx % FB_ENTRIES_PER_BLOCK) {
 			// Assuming in-order FAT entries
 			curr = curr->next;
 		}
-		curr_fat_blk_idx = next_fat_blk_idx;
+		++curr_fat_blk_idx; 
 	}
 
 	curr = FAT_nodes.start;
@@ -125,7 +151,8 @@ size_t allocate_new_data_block (int fd, int current_last_data_blk) {
 	return curr_fat_blk_idx;
 }
 
-size_t get_next_data_blk (int fd, int current_data_blk) {
+// returns index of next data block after @current_data_blk in file associated with @fd
+int get_next_data_blk (int fd, int current_data_blk) {
 		
 	// Locate appropriate FAT node
 	int FAT_block_num_last_entry = current_data_blk / FB_ENTRIES_PER_BLOCK;
@@ -211,10 +238,18 @@ int fs_mount(const char *diskname)
 
 int fs_umount(void)
 {
+	// Check if there are any open fd's
+	int all_fd_closed = 1;
+	for (int i = 0 ; i < FS_OPEN_MAX_COUNT ; ++i) {
+		if (fd_table[i].used == 1) {
+			all_fd_closed = 0;
+			break;
+		}
+	}
+	
 	// Check if no FS is mounted, if disk cannot be closed, or if there are still open file descriptors
-	if (!FS_mounted || block_disk_count() == -1) {
+	if (!FS_mounted || block_disk_count() == -1 || !all_fd_closed) {
 		return -1;
-		// TO DO: add to error check
 	}
 
 	// Write out FAT blocks to disk
@@ -337,28 +372,6 @@ int fs_create(const char *filename)
 	rootdir_arr[empty_entry_idx].file_size = 0;
 	rootdir_arr[empty_entry_idx].first_data_block_index = FAT_EOC;
 	
-	// DELETE LATER - FOR REFERENCE ONLY
-	// int first_free_FAT_idx;
-	// int free_FAT_found = 0;
-	// struct FAT_node* curr = FAT_nodes.start;
-	// for (int i = 0; i < superblk.num_blocks_FAT; i++) {
-	// 	for (int j = 1; j < FB_ENTRIES_PER_BLOCK; j++) {
-	// 		if (curr->entries[j] == 0) {
-	// 			// first_free_FAT_idx = j;
-	// 			curr->entries[j] = FAT_EOC;
-	// 			free_FAT_found = 1;
-	// 			break;
-	// 		}
-	// 	}
-	// 	if (free_FAT_found == 1) {
-	// 		break;
-	// 	}
-	// 	curr = curr->next;
-	// }
-
-	// curr->entries[first_free_FAT_idx] = FAT_EOC;
-	// rootdir_arr[empty_entry_idx].first_data_block_index = first_free_FAT_idx;
-	
 	return 0;
 }
 
@@ -376,9 +389,21 @@ int fs_delete(const char *filename)
 		}
 	}
 	
-	// Check if no FS is mounted, if filename is invalid, if filename does not exist in root directory,
-	// or if filename is currently opened
+	// Check if no FS is mounted, if filename is invalid, or if filename does not exist in root directory
 	if (!FS_mounted || &filename[0] == NULL || strlen(filename) >= FS_FILENAME_LEN || !filename_exists) {
+		return -1;
+	}
+
+	int fd;
+	for (int i = 0 ; i < FS_OPEN_MAX_COUNT ; ++i) {
+		if (fd_table[i].root_dir_index == filename_rootdir_inx) {
+			fd = i;
+			break;
+		}
+	}
+
+	// Check if filename is currently opened
+	if (fd_table[fd].used) {
 		return -1;
 	}
 
@@ -386,7 +411,6 @@ int fs_delete(const char *filename)
 	if (rootdir_arr[filename_rootdir_inx].first_data_block_index != FAT_EOC) {
 		int FAT_block_num = rootdir_arr[filename_rootdir_inx].first_data_block_index / FB_ENTRIES_PER_BLOCK;
 		int delete_FAT_inx = rootdir_arr[filename_rootdir_inx].first_data_block_index % FB_ENTRIES_PER_BLOCK;
-		printf("FAT_block_num: %d, delete_FAT_inx: %d\n", FAT_block_num, delete_FAT_inx);
 		
 		// Locate appropriate FAT node
 		struct FAT_node* curr = FAT_nodes.start;
@@ -477,7 +501,6 @@ int fs_open(const char *filename)
 	fd_table[next_open_fd_index].root_dir_index = filename_rootdir_inx;
 	fd_table[next_open_fd_index].offset = 0;
 	
-	//fprintf(stderr, "FD returned for file %s is: %d\n", filename, next_open_fd_index);
 	return next_open_fd_index;
 }
 
@@ -541,6 +564,134 @@ int fs_write(int fd, void *buf, size_t count)
 	if (!fd_table[fd].used || buf == NULL) {
 		return -1;
 	}	
+
+	int rootdir_idx = fd_table[fd].root_dir_index;
+	size_t total_num_blocks = (rootdir_arr[rootdir_idx].file_size / (BLOCK_SIZE + 1)) + 1;
+	size_t blocks_left = total_num_blocks - (fd_table[fd].offset / BLOCK_SIZE);
+	size_t bytes_written = 0;
+	size_t bytes_remaining = count;
+	int data_blk_offset = superblk.data_block_start_index;
+	int data_blk_to_write = superblk.data_block_start_index + return_data_block(fd, count);
+	int old_offset = fd_table[fd].offset;	
+
+	while (1) {
+		// done writing
+		if (!bytes_remaining) {
+			break;
+		}
+
+		// Create a bounce buffer that stores entire data block
+		char bounce_buf[BLOCK_SIZE];
+		if (!(data_blk_to_write >= superblk.data_block_start_index + superblk.num_data_blocks)) {
+			// Data block allocated, read block
+			int readret = block_read(data_blk_to_write, &bounce_buf);
+			if (readret == -1) {
+				fprintf(stderr, "Could not read from disk (fs_write)\n");
+				return -1;
+			}
+		}
+
+		size_t offset_distance = fd_table[fd].offset % BLOCK_SIZE;
+		size_t bytes_just_written;
+
+		// we are on the last data block of the underlying disk: write last block, then exit
+		if (data_blk_to_write + 1 >= superblk.data_block_start_index + superblk.num_data_blocks) {
+			memcpy((void*)(bounce_buf + offset_distance), (void*)(buf + bytes_written), BLOCK_SIZE - offset_distance);
+			block_write(data_blk_to_write, &bounce_buf);
+			bytes_just_written = BLOCK_SIZE - offset_distance;
+			bytes_written += bytes_just_written;
+			bytes_remaining = 0;
+			data_blk_to_write -= data_blk_offset;
+			int node_num = data_blk_to_write / FB_ENTRIES_PER_BLOCK;
+
+			struct FAT_node* curr = FAT_nodes.start;
+			for (int i = 0; i < node_num ; i++) {
+				curr = curr->next;
+			}
+
+			curr->entries[data_blk_to_write % FB_ENTRIES_PER_BLOCK] = FAT_EOC;
+			data_blk_to_write += data_blk_offset;
+			fd_table[fd].offset += bytes_just_written;
+			break;
+		}
+
+
+		// have more blocks to write to after this one
+		else if ((bytes_remaining + offset_distance) > BLOCK_SIZE) {
+			memcpy((void*)(bounce_buf + offset_distance), (void*)(buf + bytes_written), BLOCK_SIZE - offset_distance);
+			block_write(data_blk_to_write, &bounce_buf);
+			bytes_just_written = BLOCK_SIZE - offset_distance;
+			bytes_written += bytes_just_written;
+			bytes_remaining -= bytes_just_written;
+
+			data_blk_to_write -= data_blk_offset;
+			int node_num = data_blk_to_write / FB_ENTRIES_PER_BLOCK;
+
+			struct FAT_node* curr = FAT_nodes.start;
+			for (int i = 0; i < node_num ; i++) {
+				curr = curr->next;
+			}
+
+			if (blocks_left == 1) {
+				curr->entries[data_blk_to_write % FB_ENTRIES_PER_BLOCK] = FAT_EOC;
+			}
+			data_blk_to_write += data_blk_offset;
+
+			// have no more data blocks left after current but more data to write, must extend file
+			if (blocks_left == 1) {
+				int new_data_block = allocate_new_data_block(fd, data_blk_to_write - data_blk_offset);
+				// if there are no more empty data blocks available
+				if (new_data_block == -1) {
+					fd_table[fd].offset += bytes_just_written;
+					int new_bytes_written = bytes_written - rootdir_arr[fd_table[fd].root_dir_index].file_size;
+					if (new_bytes_written > 0) {
+						rootdir_arr[fd_table[fd].root_dir_index].file_size += (new_bytes_written + old_offset);
+					}
+					return bytes_written;
+				}
+				// successful new block allocation
+				data_blk_to_write = new_data_block + data_blk_offset;
+			}
+			// otherwise (we do have data blocks left in the FS)
+			else {
+				int last_data_block = data_blk_to_write;
+				data_blk_to_write = get_next_data_blk(fd, data_blk_to_write - data_blk_offset);
+				curr->entries[(last_data_block - data_blk_offset) % FB_ENTRIES_PER_BLOCK] = data_blk_to_write;
+				data_blk_to_write += data_blk_offset;
+			}
+		}
+		// last write block
+		else {
+			memcpy((void*)(bounce_buf + offset_distance), (void*)(buf + bytes_written), bytes_remaining);
+			block_write(data_blk_to_write, &bounce_buf);
+			bytes_just_written = bytes_remaining;
+			bytes_written += bytes_just_written;
+			bytes_remaining = 0;
+			data_blk_to_write -= data_blk_offset;
+			int node_num = data_blk_to_write / FB_ENTRIES_PER_BLOCK;
+
+			struct FAT_node* curr = FAT_nodes.start;
+			for (int i = 0; i < node_num ; i++) {
+				curr = curr->next;
+			}
+
+			curr->entries[data_blk_to_write % FB_ENTRIES_PER_BLOCK] = FAT_EOC;
+			data_blk_to_write += data_blk_offset;
+		}
+
+		// Update write status variables
+		fd_table[fd].offset += bytes_just_written;
+		// decrement blocks left UNLESS we have already hit the final one, then keep it at 1
+		if (blocks_left > 1) {
+			blocks_left -= 1;
+		}
+	}
+	
+	int new_bytes_written = bytes_written - rootdir_arr[fd_table[fd].root_dir_index].file_size;
+	if (new_bytes_written > 0) {
+		rootdir_arr[fd_table[fd].root_dir_index].file_size += (new_bytes_written + old_offset);
+	}
+	return bytes_written;
 }
 
 int fs_read(int fd, void *buf, size_t count)
@@ -560,7 +711,7 @@ int fs_read(int fd, void *buf, size_t count)
 	size_t blocks_left_to_read = total_num_blocks - (fd_table[fd].offset / BLOCK_SIZE);
 	size_t bytes_read = 0;
 	size_t bytes_remaining = count;
-	int data_blk_to_read = superblk.data_block_start_index + return_data_block(fd);	
+	int data_blk_to_read = superblk.data_block_start_index + return_data_block(fd, count);	
 	int data_blk_offset = superblk.data_block_start_index;
 
 	// Go through all data blocks until there are no more data blocks to read
@@ -580,9 +731,23 @@ int fs_read(int fd, void *buf, size_t count)
 		size_t offset_distance = fd_table[fd].offset % BLOCK_SIZE;
 		size_t bytes_just_read;
 
-		// printf("BEFORE - blocks_left_to_read: %ld, bytes_remaining: %ld, bytes_read: %ld, fd_table[fd].offset: %ld, offset_distance: %ld\n", blocks_left_to_read, bytes_remaining, bytes_read, fd_table[fd].offset, offset_distance);
+		// user wants to read more bytes than blocks allocated for file
+		if (blocks_left_to_read == 1 && (bytes_remaining + offset_distance) > BLOCK_SIZE) {
+			memcpy((void*)(buf + bytes_read), (void*)(bounce_buf + offset_distance), rootdir_arr[rootdir_idx].file_size % BLOCK_SIZE);
+			bytes_just_read = rootdir_arr[rootdir_idx].file_size % BLOCK_SIZE;
+			bytes_read += bytes_just_read;
+			bytes_remaining = 0;
+		}
 
-		if ((bytes_remaining + offset_distance) > BLOCK_SIZE) {
+		// user wants to read more bytes, but ends in the same data block that the file ends in
+		else if (blocks_left_to_read == 1 && (rootdir_arr[rootdir_idx].file_size % BLOCK_SIZE ) != 0 && (bytes_remaining + offset_distance) > (rootdir_arr[rootdir_idx].file_size % BLOCK_SIZE )) {
+			memcpy((void*)(buf + bytes_read), (void*)(bounce_buf + offset_distance), rootdir_arr[rootdir_idx].file_size % BLOCK_SIZE);
+			bytes_just_read = rootdir_arr[rootdir_idx].file_size % BLOCK_SIZE;
+			bytes_read += bytes_just_read;
+			bytes_remaining = 0;
+		}
+
+		else if ((bytes_remaining + offset_distance) > BLOCK_SIZE) {
 			// Need to read another data block
 			memcpy((void*)(buf + bytes_read), (void*)(bounce_buf + offset_distance), BLOCK_SIZE - offset_distance);
 			bytes_just_read = BLOCK_SIZE - offset_distance;
@@ -603,33 +768,7 @@ int fs_read(int fd, void *buf, size_t count)
 		// Update read status variables
 		fd_table[fd].offset += bytes_just_read;
 		blocks_left_to_read -= 1;
-		// printf("AFTER - blocks_left_to_read: %ld, bytes_remaining: %ld, bytes_read: %ld, offset_distance: %ld\n", blocks_left_to_read, bytes_remaining, bytes_read, offset_distance);
 	}
-////////////////////////////////////
-	// char bounce_buf[BLOCK_SIZE];
-	// size_t offset_distance = fd_table[fd].offset % BLOCK_SIZE;
-	// int readret = block_read(data_blk_to_read, &bounce_buf);
-	// if (readret == -1) {
-	// 	fprintf(stderr, "Could not read from disk (fs_read)\n");
-	// 	return -1;
-	// }
-	// memcpy(buf, (void*)bounce_buf + offset_distance, bytes_remaining);
-	// bytes_read = bytes_remaining;
-////////////////////////////////////
-	// char bounce_buf[BLOCK_SIZE];
-	// int readret = block_read(data_blk_to_read, &bounce_buf);
-	// if (readret == -1) {
-	// 	fprintf(stderr, "Could not read from disk (fs_read)\n");
-	// 	return -1;
-	// }
 
-	// printf("bounce_buf (read block %d):\n", data_blk_to_read);
-	// for (int i = 0; i < count; i++) {
-	// 	printf("%d ", bounce_buf[i]);
-	// }
-	// printf("Read %ld bytes from file. Compared %ld correct.\n", bytes_read, bytes_read);
-	// memcpy(buf, (void*)bounce_buf + fd_table[fd].offset, count);
-	//fd_table[fd].offset += count;
 	return bytes_read;
 }
-

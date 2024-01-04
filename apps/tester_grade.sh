@@ -302,18 +302,17 @@ read_six_full_blocks() {
     log "\n--- Running ${FUNCNAME} ---"
 
 	run_tool ./fs_make.x test.fs 10
-	python3 -c "for i in range(24576): print('a', end='')" > test-file-1
-	run_tool ./fs_ref.x add test.fs test-file-1
+	run_tool ./fs_ref.x add test.fs test-file-1.txt
     cat <<END_SCRIPT > read_block.script
 MOUNT
-OPEN	test-file-1
-READ	24576	FILE	test-file-1
+OPEN	test-file-1.txt
+READ	24576	FILE	test-file-1-r4.txt
 CLOSE
 UMOUNT
 END_SCRIPT
     run_test ./test_fs.x script test.fs read_block.script
 
-	rm -f test.fs test-file-1 read_block.script
+	rm -f test.fs read_block.script
 
 	local line_array=()
 	line_array+=("$(select_line "${STDOUT}" "3")")
@@ -330,18 +329,17 @@ read_eight_partial_blocks() {
     log "\n--- Running ${FUNCNAME} ---"
 
 	run_tool ./fs_make.x test.fs 10
-	python3 -c "for i in range(35000): print('a', end='')" > test-file-1
-	run_tool ./fs_ref.x add test.fs test-file-1
+	run_tool ./fs_ref.x add test.fs test-file-1.txt
     cat <<END_SCRIPT > read_block.script
 MOUNT
-OPEN	test-file-1
-READ	30000	FILE	test-file-1
+OPEN	test-file-1.txt
+READ	30000	FILE	test-file-1-r5.txt
 CLOSE
 UMOUNT
 END_SCRIPT
     run_test ./test_fs.x script test.fs read_block.script
 
-	rm -f test.fs test-file-1 read_block.script
+	rm -f test.fs read_block.script
 
 	local line_array=()
 	line_array+=("$(select_line "${STDOUT}" "3")")
@@ -380,22 +378,280 @@ END_SCRIPT
     log "Score: ${score}"
 }
 
+# read blocks with request larger than file
+read_blocks_overshoot() {
+    log "\n--- Running ${FUNCNAME} ---"
+
+	run_tool ./fs_make.x test.fs 10
+    python3 -c "for i in range(6193): print('a', end='')" > test-file-2
+	run_tool ./fs_ref.x add test.fs test-file-2
+    cat <<END_SCRIPT > read_block.script
+MOUNT
+OPEN	test-file-2
+READ	7000	FILE	test-file-2
+CLOSE
+UMOUNT
+END_SCRIPT
+    run_test ./test_fs.x script test.fs read_block.script
+
+	rm -f test.fs test-file-2 read_block.script
+
+	local line_array=()
+	line_array+=("$(select_line "${STDOUT}" "3")")
+    local corr_array=()
+	corr_array+=("Read 6193 bytes from file. Compared 6193 correct.")
+
+    local score
+    compare_lines line_array[@] corr_array[@] score
+    log "Score: ${score}"
+}
+
+# write to the first few bytes of the first block
+write_partial_block() {
+    log "\n--- Running ${FUNCNAME} ---"
+
+	run_tool ./fs_make.x test.fs 10
+	run_tool ./fs_ref.x add test.fs test-file-1.txt
+    cat <<END_SCRIPT > read_block.script
+MOUNT
+OPEN	test-file-1.txt
+WRITE	DATA	HELLOWORLD
+CLOSE
+UMOUNT
+END_SCRIPT
+    run_test ./test_fs.x script test.fs read_block.script
+
+	rm -f test.fs read_block.script
+
+	local line_array=()
+	line_array+=("$(select_line "${STDOUT}" "3")")
+    local corr_array=()
+	corr_array+=("Wrote 10 bytes to file.")
+
+    local score
+    compare_lines line_array[@] corr_array[@] score
+    log "Score: ${score}"
+}
+
+# write a block
+write_block() {
+    log "\n--- Running ${FUNCNAME} ---"
+
+	run_tool ./fs_make.x test.fs 10
+	run_tool ./fs_ref.x add test.fs test-file-1.txt
+    cat <<END_SCRIPT > read_block.script
+MOUNT
+OPEN	test-file-1.txt
+WRITE	FILE	test-file-1-s1.txt
+CLOSE
+UMOUNT
+END_SCRIPT
+    run_test ./test_fs.x script test.fs read_block.script
+
+	rm -f test.fs read_block.script
+
+	local line_array=()
+	line_array+=("$(select_line "${STDOUT}" "3")")
+    local corr_array=()
+	corr_array+=("Wrote 4096 bytes to file.")
+
+    local score
+    compare_lines line_array[@] corr_array[@] score
+    log "Score: ${score}"
+}
+
+# write to the first few bytes of the first block
+write_partial_block() {
+    log "\n--- Running ${FUNCNAME} ---"
+
+	run_tool ./fs_make.x test.fs 10
+	run_tool ./fs_ref.x add test.fs test-file-1.txt
+    cat <<END_SCRIPT > read_block.script
+MOUNT
+OPEN	test-file-1.txt
+WRITE	DATA	HELLOWORLD
+CLOSE
+UMOUNT
+END_SCRIPT
+    run_test ./test_fs.x script test.fs read_block.script
+
+	rm -f test.fs read_block.script
+
+	local line_array=()
+	line_array+=("$(select_line "${STDOUT}" "3")")
+    local corr_array=()
+	corr_array+=("Wrote 10 bytes to file.")
+
+    local score
+    compare_lines line_array[@] corr_array[@] score
+    log "Score: ${score}"
+}
+
+# write to one and a half blocks
+write_two_partial_blocks() {
+    log "\n--- Running ${FUNCNAME} ---"
+
+	run_tool ./fs_make.x test.fs 10
+	run_tool ./fs_ref.x add test.fs test-file-1.txt
+    cat <<END_SCRIPT > read_block.script
+MOUNT
+OPEN	test-file-1.txt
+WRITE	FILE	test-file-1-s2.txt
+CLOSE
+UMOUNT
+END_SCRIPT
+    run_test ./test_fs.x script test.fs read_block.script
+
+	rm -f test.fs read_block.script
+
+	local line_array=()
+	line_array+=("$(select_line "${STDOUT}" "3")")
+    local corr_array=()
+	corr_array+=("Wrote 5000 bytes to file.")
+
+    local score
+    compare_lines line_array[@] corr_array[@] score
+    log "Score: ${score}"
+}
+
+# write to one and a half blocks, write past file length (write up to end of FS)
+write_past_file_1() {
+    log "\n--- Running ${FUNCNAME} ---"
+
+	run_tool ./fs_make.x test.fs 3
+    python3 -c "for i in range(5000): print('a', end='')" > test-file-2
+	run_tool ./fs_ref.x add test.fs test-file-2
+    cat <<END_SCRIPT > read_block.script
+MOUNT
+OPEN	test-file-2
+WRITE	FILE	test-file-1-s3.txt
+CLOSE
+UMOUNT
+END_SCRIPT
+    run_test ./test_fs.x script test.fs read_block.script
+
+	rm -f test.fs test-file-2 read_block.script
+
+	local line_array=()
+	line_array+=("$(select_line "${STDOUT}" "3")")
+    local corr_array=()
+	corr_array+=("Wrote 8192 bytes to file.")
+
+    local score
+    compare_lines line_array[@] corr_array[@] score
+    log "Score: ${score}"
+}
+
+# write to one and a half blocks, write less than file length (allocate one more block)
+write_block_2() {
+    log "\n--- Running ${FUNCNAME} ---"
+
+	run_tool ./fs_make.x test.fs 10
+    python3 -c "for i in range(5000): print('a', end='')" > test-file-2
+	run_tool ./fs_ref.x add test.fs test-file-2
+    cat <<END_SCRIPT > read_block.script
+MOUNT
+OPEN	test-file-2
+WRITE	FILE	test-file-1-s4.txt
+CLOSE
+UMOUNT
+END_SCRIPT
+    run_test ./test_fs.x script test.fs read_block.script
+
+	rm -f test.fs test-file-2 read_block.script
+
+	local line_array=()
+	line_array+=("$(select_line "${STDOUT}" "3")")
+    local corr_array=()
+	corr_array+=("Wrote 10000 bytes to file.")
+
+    local score
+    compare_lines line_array[@] corr_array[@] score
+    log "Score: ${score}"
+}
+
+# write to partial of one block, write less than file length (allocate many blocks)
+write_block_3() {
+    log "\n--- Running ${FUNCNAME} ---"
+
+	run_tool ./fs_make.x test.fs 10
+    python3 -c "for i in range(1000): print('a', end='')" > test-file-2
+	run_tool ./fs_ref.x add test.fs test-file-2
+    cat <<END_SCRIPT > read_block.script
+MOUNT
+OPEN	test-file-2
+WRITE	FILE	test-file-1-s3.txt
+CLOSE
+UMOUNT
+END_SCRIPT
+    run_test ./test_fs.x script test.fs read_block.script
+
+	rm -f test.fs test-file-2 read_block.script
+
+	local line_array=()
+	line_array+=("$(select_line "${STDOUT}" "3")")
+    local corr_array=()
+	corr_array+=("Wrote 20000 bytes to file.")
+
+    local score
+    compare_lines line_array[@] corr_array[@] score
+    log "Score: ${score}"
+}
+
+# write to partial of one block, write more than file length (allocate only to file length)
+write_past_file_2() {
+    log "\n--- Running ${FUNCNAME} ---"
+
+	run_tool ./fs_make.x test.fs 10
+    python3 -c "for i in range(1000): print('a', end='')" > test-file-2
+	run_tool ./fs_ref.x add test.fs test-file-2
+    cat <<END_SCRIPT > read_block.script
+MOUNT
+OPEN	test-file-2
+WRITE	FILE	test-file-1-s5.txt
+CLOSE
+UMOUNT
+END_SCRIPT
+    run_test ./test_fs.x script test.fs read_block.script
+
+	rm -f test.fs test-file-2 read_block.script
+
+	local line_array=()
+	line_array+=("$(select_line "${STDOUT}" "3")")
+    local corr_array=()
+	corr_array+=("Wrote 36864 bytes to file.")
+
+    local score
+    compare_lines line_array[@] corr_array[@] score
+    log "Score: ${score}"
+}
+
+
+
 #
 # Run tests
 #
 run_tests() {
 	# Phase 1
-	#info
-	#info_full
-	# Phase 2
-	#create_simple
+	info
+	info_full
+	#Phase 2
+	create_simple
     # Phase 3 + 4
-    # read_block
-    # read_partial_block
-    #read_two_partial_blocks
-    #read_six_full_blocks
-    #read_eight_partial_blocks
+    read_block
+    read_partial_block
+    read_two_partial_blocks
+    read_six_full_blocks
+    read_eight_partial_blocks
     read_all_blocks
+    read_blocks_overshoot
+    write_partial_block
+    write_block
+    write_two_partial_blocks
+    write_past_file_1
+    write_block_2
+    write_block_3
+    write_past_file_2
 }
 
 make_fs() {
