@@ -27,6 +27,9 @@ die() {
 #
 # Scoring helpers
 #
+``
+TESTS_SCORE=0
+
 select_line() {
 	# 1: string
 	# 2: line to select
@@ -52,6 +55,7 @@ compare_lines() {
 	declare -a expect_lines=("${!2}")
     local __score=$3
     local partial="0"
+    local success="0"
 
     # Amount of partial credit for each correct output line
     local step=$(bc -l <<< "1.0 / ${#expect_lines[@]}")
@@ -61,12 +65,14 @@ compare_lines() {
 		if [[ "${output_lines[${i}]}" =~ "${expect_lines[${i}]}" ]]; then
 			pass "${output_lines[${i}]}"
             partial=$(bc <<< "${partial} + ${step}")
+            success=1
 		else
 			fail "${output_lines[${i}]}" "${expect_lines[${i}]}" ]]
 		fi
 	done
 
     # Return final score
+    TESTS_SCORE=$(($TESTS_SCORE + $success))
     eval ${__score}="'${partial}'"
 }
 
@@ -631,6 +637,7 @@ END_SCRIPT
 #
 # Run tests
 #
+TESTS_TOTAL=17
 run_tests() {
 	# Phase 1
 	info
@@ -670,5 +677,17 @@ make_fs() {
     done
 }
 
+show_test_results() {
+    echo -e "\nTotal tests passed: $TESTS_SCORE / $TESTS_TOTAL"
+}
+
+clean_fs() {
+    # Delete all compiled files
+    make clean > /dev/null 2>&1 ||
+        die "Cleaning failed"
+}
+
 make_fs
 run_tests
+show_test_results
+clean_fs
