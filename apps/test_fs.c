@@ -526,7 +526,7 @@ void usage(char *program)
 	size_t i;
 	fprintf(stderr, "Usage: %s <command> [<arg>]\n", program);
 	fprintf(stderr, "Possible commands are:\n");
-	for (i = 0; i < ARRAY_SIZE(commands); i++)
+	for (i = 0; i < ARRAY_SIZE(commands)-1; i++)
 		fprintf(stderr, "\t%s\n", commands[i].name);
 	exit(1);
 }

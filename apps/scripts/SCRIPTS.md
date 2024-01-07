@@ -16,6 +16,7 @@ file and the second is the name of the script file.
 ```
 $ ./test_fs.x script <disk.fs> <script_file>
 ```
+*NOTE: this script command does not currently work directly in the terminal as scripts are held in their own folder. Only execute scripts in .sh tester files for simplicity.*
 
 The script file contains a sequence of commands to be performed on the given
 filesystem. Each command must be on its own line. If a command has arguments,
