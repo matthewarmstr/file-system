@@ -1,13 +1,13 @@
 # File System Based on FAT16
-A simple yet robust file system built using a File Allocation Table (FAT) written in C. This file system supports up to 128 files in a single root directory. Rigorous testing methods incorporating multiple Unix shell scripts and sample text files were used to continually test the functionality of the file system. A custom makefile was also constructed to compile the necessary code for the disk and filesystem layers.
+A simple yet robust file system built using a File Allocation Table (FAT) written in C. This file system supports up to 128 files in a single root directory. Rigorous testing methods incorporating multiple Unix shell scripts and sample text files were used to continually test the functionality of the file system. Two makefiles (one each for the `apps` and `libfs` directories) compile the necessary code for the disk and filesystem layers.
 
 ## Interacting with the File System
 To begin, navigate to the `apps` directory for this project and run the makefile with the following terminal commands:
 ~~~
-cd [file path to this project]/apps
+cd [path to this project]/apps
 make
 ~~~
-This will compile the C code that runs the file system and automatically create a virtual disk named `disk.fs` with 8192 data blocks. To create one with a different number of data blocks (greater than 0, less than 8193), type the following command:
+This will set up the file system and automatically create a virtual disk named `disk.fs` with 8192 data blocks. To create a disk with a different number of data blocks (greater than 0, less than 8193), type the following command:
 ~~~
 ./fs_make.x <diskname> <data block count (1-8192)>
 ~~~
@@ -22,7 +22,7 @@ Next, the executable for `test_fs.c` can be used in combination with any text fi
 ~~~
 The information about the file system that is displayed with the `info` command shown above includes its total block count, the number of data blocks, the number of FAT blocks, the number of data blocks, the block index numbers of the root directory and first data block, the ratio of free data blocks to the number of FAT blocks, and the number of stored files out of 128. 
 
-To verify the functionality of the file system, a shell script was constructed in `apps/tester_grade.sh` to continuously check the output of the file system. It combines various terminal commands with existing text files, along with some script files in the `apps/scripts` directory, to execute many different disk storage scenarios that the file system needs to handle. To see how these individual script files work, see the instructions at `apps/scripts/SCRIPTS.md`. The entire shell script can be executed by running `./tester_grade.sh` while in the `apps` directory.
+To verify the functionality of the file system, a shell script was constructed in `apps/tester_grade.sh` to continuously check the output of the file system. It combines various terminal commands with existing text files, along with some script files in the `apps/scripts` directory, to execute many different disk storage scenarios that the file system needs to handle. To see how these individual script files work, see the instructions at `apps/scripts/SCRIPTS.md`. The entire shell script can be executed by running `./tester_grade.sh` in the command line while in the `apps` directory.
 
 ## Overview of File System Structure
 This custom file system operates on a virtual disk that appears as a single binary file. A specific block API manipulates the data stored directly on the virtual disk, which includes actions to open and close the disk and read/write entire blocks of data. The file system is then tasked with using the block API to manage how data inside files is added, edited, and removed from the disk. This higher abstraction layer can mount/unmount a virtual disk and read/write as many data blocks as needed for the file system to maintain the disk's contents as expected.
