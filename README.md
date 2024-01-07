@@ -2,27 +2,25 @@
 A simple yet robust file system built using a File Allocation Table (FAT) written in C. This file system supports up to 128 files in a single root directory. Rigorous testing methods incorporating multiple Unix shell scripts and sample text files were used to continually test the functionality of the file system. A custom makefile was also constructed to compile the necessary code for the disk and filesystem layers.
 
 ## Interacting with the File System
-To begin, navigate to the `apps` directory and run the makefile with the following commands:
+To begin, navigate to the `apps` directory for this project and run the makefile with the following terminal commands:
 ~~~
-cd apps
+cd [file path to this project]/apps
 make
 ~~~
-This will compile the C code that runs the file system and automatically create a virtual disk named 'disk.fs' with 8192 data blocks. To create one with a different number of data blocks (greater than 0, less than 8193), type the following command:
+This will compile the C code that runs the file system and automatically create a virtual disk named `disk.fs` with 8192 data blocks. To create one with a different number of data blocks (greater than 0, less than 8193), type the following command:
 ~~~
 ./fs_make.x <diskname> <data block count (1-8192)>
 ~~~
 Next, the executable for `test_fs.c` can be used in combination with any text file (many are included, and more can be added) to interact with the file system. The available input commands for using the file system in the terminal include:
 ~~~
-./test_fs.x info <diskname>              | "Display info about the file system, including its total block count, the number of data blocks,
-                                            the number of FAT blocks, the number of data blocks, the block index numbers of
-                                            the root directory and first data block, the ratio of free data blocks to the number of FAT blocks,
-                                            and number of stored files out of 128"
+./test_fs.x info <diskname>              | "Display info about the file system"
 ./test_fs.x ls <diskname>                | "List names of files stored on the root directory of disk"
 ./test_fs.x add <diskname> <filename>    | "Add a file to disk"
 ./test_fs.x rm <diskname> <filename>     | "Remove a file from disk"
 ./test_fs.x cat <diskname> <filename>    | "View the contents of a file stored on disk"
 ./test_fs.x stat <diskname> <filename>   | "Get the size of a file stored on disk in bytes"
 ~~~
+The information about the file system that is displayed with the `info` command shown above includes its total block count, the number of data blocks, the number of FAT blocks, the number of data blocks, the block index numbers of the root directory and first data block, the ratio of free data blocks to the number of FAT blocks, and the number of stored files out of 128. 
 
 To verify the functionality of the file system, a shell script was constructed in `apps/tester_grade.sh` to continuously check the output of the file system. It combines various terminal commands with existing text files, along with some script files in the `apps/scripts` directory, to execute many different disk storage scenarios that the file system needs to handle. To see how these individual script files work, see the instructions at `apps/scripts/SCRIPTS.md`. The entire shell script can be executed by running `./tester_grade.sh` while in the `apps` directory.
 
