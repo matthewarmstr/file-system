@@ -48,7 +48,8 @@ pass() {
 }
 
 compare_lines() {
-	# 1: output
+	TESTS_TOTAL=$(($TESTS_TOTAL + 1))
+    # 1: output
 	# 2: expected
     # 3: score (output)
 	declare -a output_lines=("${!1}")
@@ -228,16 +229,10 @@ read_block() {
 
 	run_tool ./fs_make.x test.fs 10
 	run_tool ./fs_ref.x add test.fs test-file-1.txt
-    cat <<END_SCRIPT > read_block.script
-MOUNT
-OPEN	test-file-1.txt
-READ	4096	FILE	test-file-1-r1.txt
-CLOSE
-UMOUNT
-END_SCRIPT
-    run_test ./test_fs.x script test.fs read_block.script
+    
+    run_test ./test_fs.x script test.fs scripts/read_block.script
 
-	rm -f test.fs read_block.script
+	rm -f test.fs
 
 	local line_array=()
 	line_array+=("$(select_line "${STDOUT}" "3")")
@@ -255,16 +250,10 @@ read_partial_block() {
 
 	run_tool ./fs_make.x test.fs 10
 	run_tool ./fs_ref.x add test.fs test-file-1.txt
-    cat <<END_SCRIPT > read_block.script
-MOUNT
-OPEN	test-file-1.txt
-READ	40	FILE	test-file-1-r2.txt
-CLOSE
-UMOUNT
-END_SCRIPT
-    run_test ./test_fs.x script test.fs read_block.script
+    
+    run_test ./test_fs.x script test.fs scripts/read_partial_block.script
 
-	rm -f test.fs read_block.script
+	rm -f test.fs
 
 	local line_array=()
 	line_array+=("$(select_line "${STDOUT}" "3")")
@@ -282,16 +271,10 @@ read_two_partial_blocks() {
 
 	run_tool ./fs_make.x test.fs 10
 	run_tool ./fs_ref.x add test.fs test-file-1.txt
-    cat <<END_SCRIPT > read_block.script
-MOUNT
-OPEN	test-file-1.txt
-READ	6144	FILE	test-file-1-r3.txt
-CLOSE
-UMOUNT
-END_SCRIPT
-    run_test ./test_fs.x script test.fs read_block.script
 
-	rm -f test.fs read_block.script
+    run_test ./test_fs.x script test.fs scripts/read_two_partial_blocks.script
+
+	rm -f test.fs
 
 	local line_array=()
 	line_array+=("$(select_line "${STDOUT}" "3")")
@@ -309,16 +292,10 @@ read_six_full_blocks() {
 
 	run_tool ./fs_make.x test.fs 10
 	run_tool ./fs_ref.x add test.fs test-file-1.txt
-    cat <<END_SCRIPT > read_block.script
-MOUNT
-OPEN	test-file-1.txt
-READ	24576	FILE	test-file-1-r4.txt
-CLOSE
-UMOUNT
-END_SCRIPT
-    run_test ./test_fs.x script test.fs read_block.script
 
-	rm -f test.fs read_block.script
+    run_test ./test_fs.x script test.fs scripts/read_six_full_blocks.script
+
+	rm -f test.fs
 
 	local line_array=()
 	line_array+=("$(select_line "${STDOUT}" "3")")
@@ -336,16 +313,10 @@ read_eight_partial_blocks() {
 
 	run_tool ./fs_make.x test.fs 10
 	run_tool ./fs_ref.x add test.fs test-file-1.txt
-    cat <<END_SCRIPT > read_block.script
-MOUNT
-OPEN	test-file-1.txt
-READ	30000	FILE	test-file-1-r5.txt
-CLOSE
-UMOUNT
-END_SCRIPT
-    run_test ./test_fs.x script test.fs read_block.script
 
-	rm -f test.fs read_block.script
+    run_test ./test_fs.x script test.fs scripts/read_eight_partial_blocks.script
+
+	rm -f test.fs
 
 	local line_array=()
 	line_array+=("$(select_line "${STDOUT}" "3")")
@@ -363,16 +334,10 @@ read_all_blocks() {
 
 	run_tool ./fs_make.x test.fs 10
 	run_tool ./fs_ref.x add test.fs test-file-1.txt
-    cat <<END_SCRIPT > read_block.script
-MOUNT
-OPEN	test-file-1.txt
-READ	36864	FILE	test-file-1.txt
-CLOSE
-UMOUNT
-END_SCRIPT
-    run_test ./test_fs.x script test.fs read_block.script
 
-	rm -f test.fs read_block.script
+    run_test ./test_fs.x script test.fs scripts/read_all_blocks.script
+
+	rm -f test.fs
 
 	local line_array=()
 	line_array+=("$(select_line "${STDOUT}" "3")")
@@ -391,16 +356,10 @@ read_blocks_overshoot() {
 	run_tool ./fs_make.x test.fs 10
     python3 -c "for i in range(6193): print('a', end='')" > test-file-2
 	run_tool ./fs_ref.x add test.fs test-file-2
-    cat <<END_SCRIPT > read_block.script
-MOUNT
-OPEN	test-file-2
-READ	7000	FILE	test-file-2
-CLOSE
-UMOUNT
-END_SCRIPT
-    run_test ./test_fs.x script test.fs read_block.script
 
-	rm -f test.fs test-file-2 read_block.script
+    run_test ./test_fs.x script test.fs scripts/read_blocks_overshoot.script
+
+	rm -f test.fs test-file-2
 
 	local line_array=()
 	line_array+=("$(select_line "${STDOUT}" "3")")
@@ -418,16 +377,10 @@ write_partial_block() {
 
 	run_tool ./fs_make.x test.fs 10
 	run_tool ./fs_ref.x add test.fs test-file-1.txt
-    cat <<END_SCRIPT > read_block.script
-MOUNT
-OPEN	test-file-1.txt
-WRITE	DATA	HELLOWORLD
-CLOSE
-UMOUNT
-END_SCRIPT
-    run_test ./test_fs.x script test.fs read_block.script
 
-	rm -f test.fs read_block.script
+    run_test ./test_fs.x script test.fs scripts/write_partial_block.script
+
+	rm -f test.fs
 
 	local line_array=()
 	line_array+=("$(select_line "${STDOUT}" "3")")
@@ -445,16 +398,10 @@ write_block() {
 
 	run_tool ./fs_make.x test.fs 10
 	run_tool ./fs_ref.x add test.fs test-file-1.txt
-    cat <<END_SCRIPT > read_block.script
-MOUNT
-OPEN	test-file-1.txt
-WRITE	FILE	test-file-1-s1.txt
-CLOSE
-UMOUNT
-END_SCRIPT
-    run_test ./test_fs.x script test.fs read_block.script
 
-	rm -f test.fs read_block.script
+    run_test ./test_fs.x script test.fs scripts/write_block.script
+
+	rm -f test.fs
 
 	local line_array=()
 	line_array+=("$(select_line "${STDOUT}" "3")")
@@ -472,16 +419,10 @@ write_partial_block() {
 
 	run_tool ./fs_make.x test.fs 10
 	run_tool ./fs_ref.x add test.fs test-file-1.txt
-    cat <<END_SCRIPT > read_block.script
-MOUNT
-OPEN	test-file-1.txt
-WRITE	DATA	HELLOWORLD
-CLOSE
-UMOUNT
-END_SCRIPT
-    run_test ./test_fs.x script test.fs read_block.script
 
-	rm -f test.fs read_block.script
+    run_test ./test_fs.x script test.fs scripts/write_partial_block.script
+
+	rm -f test.fs
 
 	local line_array=()
 	line_array+=("$(select_line "${STDOUT}" "3")")
@@ -499,16 +440,10 @@ write_two_partial_blocks() {
 
 	run_tool ./fs_make.x test.fs 10
 	run_tool ./fs_ref.x add test.fs test-file-1.txt
-    cat <<END_SCRIPT > read_block.script
-MOUNT
-OPEN	test-file-1.txt
-WRITE	FILE	test-file-1-s2.txt
-CLOSE
-UMOUNT
-END_SCRIPT
-    run_test ./test_fs.x script test.fs read_block.script
 
-	rm -f test.fs read_block.script
+    run_test ./test_fs.x script test.fs scripts/write_two_partial_blocks.script
+
+	rm -f test.fs
 
 	local line_array=()
 	line_array+=("$(select_line "${STDOUT}" "3")")
@@ -527,16 +462,10 @@ write_past_file_1() {
 	run_tool ./fs_make.x test.fs 3
     python3 -c "for i in range(5000): print('a', end='')" > test-file-2
 	run_tool ./fs_ref.x add test.fs test-file-2
-    cat <<END_SCRIPT > read_block.script
-MOUNT
-OPEN	test-file-2
-WRITE	FILE	test-file-1-s3.txt
-CLOSE
-UMOUNT
-END_SCRIPT
-    run_test ./test_fs.x script test.fs read_block.script
 
-	rm -f test.fs test-file-2 read_block.script
+    run_test ./test_fs.x script test.fs scripts/write_past_file_1.script
+
+	rm -f test.fs test-file-2
 
 	local line_array=()
 	line_array+=("$(select_line "${STDOUT}" "3")")
@@ -555,16 +484,10 @@ write_block_2() {
 	run_tool ./fs_make.x test.fs 10
     python3 -c "for i in range(5000): print('a', end='')" > test-file-2
 	run_tool ./fs_ref.x add test.fs test-file-2
-    cat <<END_SCRIPT > read_block.script
-MOUNT
-OPEN	test-file-2
-WRITE	FILE	test-file-1-s4.txt
-CLOSE
-UMOUNT
-END_SCRIPT
-    run_test ./test_fs.x script test.fs read_block.script
 
-	rm -f test.fs test-file-2 read_block.script
+    run_test ./test_fs.x script test.fs scripts/write_block_2.script
+
+	rm -f test.fs test-file-2
 
 	local line_array=()
 	line_array+=("$(select_line "${STDOUT}" "3")")
@@ -583,16 +506,10 @@ write_block_3() {
 	run_tool ./fs_make.x test.fs 10
     python3 -c "for i in range(1000): print('a', end='')" > test-file-2
 	run_tool ./fs_ref.x add test.fs test-file-2
-    cat <<END_SCRIPT > read_block.script
-MOUNT
-OPEN	test-file-2
-WRITE	FILE	test-file-1-s3.txt
-CLOSE
-UMOUNT
-END_SCRIPT
-    run_test ./test_fs.x script test.fs read_block.script
 
-	rm -f test.fs test-file-2 read_block.script
+    run_test ./test_fs.x script test.fs scripts/write_block_3.script
+
+	rm -f test.fs test-file-2
 
 	local line_array=()
 	line_array+=("$(select_line "${STDOUT}" "3")")
@@ -611,16 +528,10 @@ write_past_file_2() {
 	run_tool ./fs_make.x test.fs 10
     python3 -c "for i in range(1000): print('a', end='')" > test-file-2
 	run_tool ./fs_ref.x add test.fs test-file-2
-    cat <<END_SCRIPT > read_block.script
-MOUNT
-OPEN	test-file-2
-WRITE	FILE	test-file-1-s5.txt
-CLOSE
-UMOUNT
-END_SCRIPT
-    run_test ./test_fs.x script test.fs read_block.script
 
-	rm -f test.fs test-file-2 read_block.script
+    run_test ./test_fs.x script test.fs scripts/write_past_file_2.script
+
+	rm -f test.fs test-file-2
 
 	local line_array=()
 	line_array+=("$(select_line "${STDOUT}" "3")")
@@ -637,7 +548,6 @@ END_SCRIPT
 #
 # Run tests
 #
-TESTS_TOTAL=17
 run_tests() {
 	# Phase 1
 	info

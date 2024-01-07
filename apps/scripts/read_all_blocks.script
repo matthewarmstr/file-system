@@ -1,5 +1,5 @@
 MOUNT
 OPEN	test-file-1.txt
-WRITE	FILE	test-w1.txt
+READ	36864	FILE	test-file-1.txt
 CLOSE
 UMOUNT

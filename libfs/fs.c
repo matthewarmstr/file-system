@@ -559,8 +559,7 @@ int fs_lseek(int fd, size_t offset)
 	return 0;
 }
 
-int fs_write(int fd, void *buf, size_t count)
-{
+int fs_write(int fd, void *buf, size_t count) {
 	// Check if no FS is mounted or if FD is out of bounds
 	if (!FS_mounted || fd < 0 || fd >= FS_OPEN_MAX_COUNT) {
 		return -1;
@@ -602,13 +601,18 @@ int fs_write(int fd, void *buf, size_t count)
 		void* writing_dest = bounce_buf + offset_distance;
 		void* writing_src = buf + total_bytes_written;
 		size_t num_bytes_writing;
-		// size_t bytes_just_written;
 
 		// Check if currently on last available data block of underlying disk
-		if (data_blk_to_write + 1 >= superblk.data_block_start_index + superblk.num_data_blocks) {
+		if (data_blk_to_write + 1 >= superblk.num_blocks_on_disk) {
+			fprintf(stderr, "writing to last available block\n");
 			num_bytes_writing = BLOCK_SIZE - offset_distance;
 			total_bytes_written += num_bytes_writing;
 			bytes_remaining = 0;
+
+			// Write to disk
+			memcpy(writing_dest, writing_src, num_bytes_writing);
+			block_write(data_blk_to_write, &bounce_buf);
+
 			data_blk_to_write -= data_blk_offset;
 
 			insert_FAT_EOC(data_blk_to_write);
@@ -619,9 +623,14 @@ int fs_write(int fd, void *buf, size_t count)
 
 		// Check if there is another block to write to after this one
 		else if ((bytes_remaining + offset_distance) > BLOCK_SIZE) {
+			fprintf(stderr, "writing to block, another follows this one\n");
 			num_bytes_writing = BLOCK_SIZE - offset_distance;
 			total_bytes_written += num_bytes_writing;
 			bytes_remaining -= num_bytes_writing;
+
+			// Write to disk
+			memcpy(writing_dest, writing_src, num_bytes_writing);
+			block_write(data_blk_to_write, &bounce_buf);
 
 			data_blk_to_write_offset_considered = data_blk_to_write - data_blk_offset;
 
@@ -631,12 +640,12 @@ int fs_write(int fd, void *buf, size_t count)
 				// Attempt to get another empty FAT data block if extension of allocated space inside filesystem is required
 				int new_data_block = allocate_new_data_block(fd, data_blk_to_write_offset_considered);
 				if (new_data_block == -1) {
+					// No more empty FAT blocks available - stop writing
 					fd_table[fd].offset += num_bytes_writing;
 					int new_bytes_written = total_bytes_written - rootdir_arr[fd_table[fd].root_dir_index].file_size;
 					if (new_bytes_written > 0) {
 						rootdir_arr[fd_table[fd].root_dir_index].file_size += (new_bytes_written + old_offset);
 					}
-					// No more empty FAT blocks available - stop writing
 					return total_bytes_written;
 				}
 				
@@ -653,19 +662,21 @@ int fs_write(int fd, void *buf, size_t count)
 		
 		// Only need current block to finish writing
 		else {
+			fprintf(stderr, "finishing writing on current block\n");
 			num_bytes_writing = bytes_remaining;
 			total_bytes_written += num_bytes_writing;
 			bytes_remaining = 0;
+
+			// Write to disk
+			memcpy(writing_dest, writing_src, num_bytes_writing);
+			block_write(data_blk_to_write, &bounce_buf);
+
 			data_blk_to_write -= data_blk_offset;
 			
 			insert_FAT_EOC(data_blk_to_write);
 
 			data_blk_to_write += data_blk_offset;
 		}
-
-		// Write to disk
-		memcpy(writing_dest, writing_src, num_bytes_writing);
-		block_write(data_blk_to_write, &bounce_buf);
 
 		// Update write status variables in fd table
 		fd_table[fd].offset += num_bytes_writing;

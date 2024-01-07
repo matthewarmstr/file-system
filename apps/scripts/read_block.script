@@ -1,5 +1,5 @@
 MOUNT
-OPEN	test-file-1-s2.txt
-READ	100000	FILE	test-file-1-s2.txt
+OPEN	test-file-1.txt
+READ	4096	FILE	test-r1.txt
 CLOSE
 UMOUNT

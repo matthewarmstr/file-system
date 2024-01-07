@@ -1,0 +1,5 @@
+MOUNT
+OPEN	test-file-2
+READ	7000	FILE	test-file-2
+CLOSE
+UMOUNT

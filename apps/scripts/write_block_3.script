@@ -1,0 +1,5 @@
+MOUNT
+OPEN	test-file-2
+WRITE	FILE	test-w3.txt
+CLOSE
+UMOUNT
