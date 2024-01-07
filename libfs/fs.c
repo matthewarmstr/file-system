@@ -604,7 +604,6 @@ int fs_write(int fd, void *buf, size_t count) {
 
 		// Check if currently on last available data block of underlying disk
 		if (data_blk_to_write + 1 >= superblk.num_blocks_on_disk) {
-			fprintf(stderr, "writing to last available block\n");
 			num_bytes_writing = BLOCK_SIZE - offset_distance;
 			total_bytes_written += num_bytes_writing;
 			bytes_remaining = 0;
@@ -623,7 +622,6 @@ int fs_write(int fd, void *buf, size_t count) {
 
 		// Check if there is another block to write to after this one
 		else if ((bytes_remaining + offset_distance) > BLOCK_SIZE) {
-			fprintf(stderr, "writing to block, another follows this one\n");
 			num_bytes_writing = BLOCK_SIZE - offset_distance;
 			total_bytes_written += num_bytes_writing;
 			bytes_remaining -= num_bytes_writing;
@@ -662,7 +660,6 @@ int fs_write(int fd, void *buf, size_t count) {
 		
 		// Only need current block to finish writing
 		else {
-			fprintf(stderr, "finishing writing on current block\n");
 			num_bytes_writing = bytes_remaining;
 			total_bytes_written += num_bytes_writing;
 			bytes_remaining = 0;

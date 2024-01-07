@@ -368,6 +368,7 @@ void thread_fs_cat(void *arg)
 	printf("Read file '%s' (%d/%d bytes)\n", filename, read, stat);
 	printf("Content of the file:\n");
 	fwrite(buf, 1, stat, stdout);
+	printf("\n");
 	fflush(stdout);
 
 	free(buf);
