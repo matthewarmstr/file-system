@@ -7,10 +7,24 @@ To begin, navigate to the 'apps' folder and run the makefile with the following 
 cd apps
 make
 ~~~
-A virtual disk with 8192 is automatically created for convenience. To replace this virtual disk or create an entirely new one with a different number of data blocks (greater than 0, less than 8193), type the following command:
+This will compile the C code that runs the file system and automatically create a virtual disk named 'disk.fs' with 8192 data blocks. To create one with a different number of data blocks (greater than 0, less than 8193), type the following command:
 ~~~
 ./fs_make.x <diskname> <data block count (1-8192)>
 ~~~
+Next, the executable for 'test_fs.c' can be used in combination with any text file (many are included, and more can be added) to interact with the file system. The available input commands for using the file system in the terminal include:
+~~~
+./test_fs.x info <diskname>                  | "Display info about the file system, including its total block count, the number of data blocks,
+                                                the number of FAT blocks, the number of data blocks, the block index numbers of
+                                                the root directory and first data block, the ratio of free data blocks to the number of FAT blocks,
+                                                and number of stored files out of 128"
+./test_fs.x ls <diskname>                    | "List names of files stored on the root directory of disk"
+./test_fs.x add <diskname> <filename>        | "Add a file to disk"
+./test_fs.x rm <diskname> <filename>         | "Remove a file from disk"
+./test_fs.x cat <diskname> <filename>        | "View the contents of a file stored on disk"
+./test_fs.x stat <diskname> <filename>       | "Get the size of a file stored on disk in bytes"
+~~~
+
+To verify the functionality of the file system, a shell script was constructed in 'apps/tester_grade.sh' to continuously check the output of the file system. It combines various terminal commands with existing text files, along with some script files in the 'apps/scripts' directory, to execute many different disk storage scenarios that the file system needs to handle. For more on how these individual script files work, see the instructions at 'apps/scripts/SCRIPTS.md'. The entire shell script can be executed by running './tester_grade.sh' while in the 'apps' folder.
 
 ## Overview of File System Structure
 This custom file system operates on a virtual disk that appears as a single binary file. A specific block API manipulates the data stored directly on the virtual disk, which includes actions to open and close the disk and read/write entire blocks of data. The file system is then tasked with using the block API to manage how data inside files is added, edited, and removed from the disk. This higher abstraction layer can mount/unmount a virtual disk and read/write as many data blocks as needed for the file system to maintain the disk's contents as expected.
@@ -65,4 +79,4 @@ This contains the information necessary to locate the maximum of 128 files store
 | 0x14   | 2                 | Index of first data block |
 | 0x16   | 10                | Unused/Padding            |
 
-The index of the first data block would correspond with the index value in the FAT (and hence the data block) that each file starts at (with the above example, 1 would be the starting index of the first file, 6 for the second file, and 7 for the second). 
+The index of the first data block would correspond with the index value in the FAT (and hence the data block) that each file starts at (with the above example, 1 would be the starting index of the first file, 6 for the second file, and 7 for the second).
