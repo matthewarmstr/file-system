@@ -7,18 +7,18 @@ To begin, navigate to the `apps` directory for this project and run the makefile
 cd [path to this project]/apps
 make
 ~~~
-This will set up the file system and automatically create a virtual disk named `disk.fs` with 8192 data blocks. To create a disk with a different number of data blocks (greater than 0, less than 8193), type the following command:
+This will set up the file system and automatically create a virtual disk named `disk.fs` with 8192 data blocks. To create a virtual disk with a different number of data blocks (greater than 0, less than 8193), type the following command:
 ~~~
 ./fs_make.x <diskname> <data block count (1-8192)>
 ~~~
 Next, the executable for `test_fs.c` can be used in combination with any text file (many are included, and more can be added) to interact with the file system. The available input commands for using the file system in the terminal include:
 ~~~
-./test_fs.x info <diskname>              | "Display info about the file system"
-./test_fs.x ls <diskname>                | "List names of files stored on the root directory of disk"
-./test_fs.x add <diskname> <filename>    | "Add a file to disk"
-./test_fs.x rm <diskname> <filename>     | "Remove a file from disk"
-./test_fs.x cat <diskname> <filename>    | "View the contents of a file stored on disk"
-./test_fs.x stat <diskname> <filename>   | "Get the size of a file stored on disk in bytes"
+./test_fs.x info <diskname>             | "Display info about the file system"
+./test_fs.x ls <diskname>               | "List names of files stored on disk's root directory"
+./test_fs.x add <diskname> <filename>   | "Add a file to disk"
+./test_fs.x rm <diskname> <filename>    | "Remove a file from disk"
+./test_fs.x cat <diskname> <filename>   | "View the contents of a file stored on disk"
+./test_fs.x stat <diskname> <filename>  | "Get the size of a file stored on disk in bytes"
 ~~~
 The information about the file system that is displayed with the `info` command shown above includes its total block count, the number of data blocks, the number of FAT blocks, the number of data blocks, the block index numbers of the root directory and first data block, the ratio of free data blocks to the number of FAT blocks, and the number of stored files out of 128. 
 
